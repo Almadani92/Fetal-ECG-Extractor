@@ -1,6 +1,3 @@
-# Upgrade pip to the latest version
-pip --upgrade
-
 # Flask for creating the web server
 Flask==2.2.5
 
