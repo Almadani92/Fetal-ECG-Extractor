@@ -12,7 +12,7 @@ Pillow  # For image handling (used for GUI)
 # PyTorch and torchvision
 # Removed +cpu specifier and added direct link to PyTorch's stable releases
 torch==1.13.1 -f https://download.pytorch.org/whl/torch_stable.html
-torchvision==0.14.1 -f https://download.pytorch.org/whl/torch_stable.html
+torchvision -f https://download.pytorch.org/whl/torch_stable.html
 
 # Other necessary Python packages
 torchtext  # If you need torchtext for additional data handling
