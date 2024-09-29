@@ -1,14 +1,25 @@
-torchsummaryX
-nibabel
-pillow 
-tensorboard
-gdown
-tqdm
-lmdb
-psutil
-pandas
-einops
-scikit-image
+# Upgrade pip to the latest version
+pip --upgrade
+
+# Flask for creating the web server
+Flask==2.2.5
+
+# Data handling and scientific computing libraries
+numpy
+scipy
+
+# Visualization
+matplotlib
+Pillow  # For image handling (used for GUI)
+
+# PyTorch and torchvision
+# Removed +cpu specifier and added direct link to PyTorch's stable releases
+torch==1.13.1 -f https://download.pytorch.org/whl/torch_stable.html
+torchvision==0.14.1 -f https://download.pytorch.org/whl/torch_stable.html
+
+# Other necessary Python packages
+torchtext  # If you need torchtext for additional data handling
+werkzeug  # For utilities in the Flask application
+
 monai==0.7.0
-torch==1.9.0+cpu 
-torchvision==0.10.0+cpu
+
