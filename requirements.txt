@@ -9,3 +9,5 @@ psutil
 pandas
 einops
 scikit-image
+git+https://github.com/davidiommi/MONAI_0_7_0.git
+torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
