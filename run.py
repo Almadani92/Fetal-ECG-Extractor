@@ -118,45 +118,7 @@ def results_page():
     <html lang="en">
     <head>
         <title>Fetal ECG Extraction Results</title>
-        <style>
-            body {
-                background-image: url('/static/full_pipeline.png');
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                font-family: Arial, sans-serif;
-                color: #fff;
-                text-align: center;
-                height: 100vh;
-                margin: 0;
-                padding: 0;
-                background-attachment: fixed;
-            }
-            .container {
-                background-color: rgba(0, 0, 0, 0.6);
-                padding: 20px;
-                border-radius: 10px;
-                margin-top: 50px;
-                display: inline-block;
-            }
-            img {
-                max-width: 90%;
-                height: auto;
-                margin: 20px 0;
-            }
-            .download-button {
-                padding: 10px 20px;
-                margin: 20px;
-                background-color: #28a745;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                font-size: 1em;
-            }
-            .download-button:hover {
-                background-color: #218838;
-            }
-        </style>
+        <!-- CSS and structure -->
     </head>
     <body>
         <div class="container">
@@ -164,7 +126,6 @@ def results_page():
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
             <br>
             <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.mat">Download Fetal ECG as .mat File</a>
-            <p>When using this resource, please cite the original publication: Almadani, M., Hadjileontiadis, L. and Khandoker, A., 2023. One-dimensional W-NETR for non-invasive single channel fetal ECG extraction. IEEE Journal of Biomedical and Health Informatics, 27(7), pp.3198-3209..</p>
         </div>
     </body>
     </html>
@@ -204,29 +165,7 @@ def upload_page():
     <html lang="en">
     <head>
         <title>Upload Maternal ECG .mat File</title>
-        <style>
-            body {
-                background-image: url('/static/full_pipeline.png');
-                background-size: contain; /* Ensure the image fits */
-                background-position: center; /* Center the image */
-                background-repeat: no-repeat; /* Prevent duplication */
-                font-family: Arial, sans-serif;
-                color: #fff;
-                text-align: center;
-            }
-            .container {
-                background-color: rgba(0, 0, 0, 0.6);
-                padding: 20px;
-                border-radius: 10px;
-                margin-top: 300px;
-                display: inline-block;
-            }
-            input[type="file"], input[type="submit"] {
-                margin: 10px;
-                padding: 10px;
-                font-size: 1em;
-            }
-        </style>
+        <!-- CSS and structure -->
     </head>
     <body>
         <div class="container">
@@ -246,5 +185,6 @@ if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
 
-    # Run the Flask server
-    app.run(debug=True)
+    # Run the Flask server using the dynamic port provided by Render
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
