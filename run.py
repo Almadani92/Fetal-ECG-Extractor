@@ -1,146 +1,93 @@
 import os
-import io
-import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend to avoid main thread issues
-from flask import Flask, request, redirect, url_for, render_template_string, send_file
-from werkzeug.utils import secure_filename
-from scipy.io import loadmat, savemat
-import numpy as np
+import logging
 import torch
+import numpy as np
 from torch.autograd import Variable
-from scipy.signal import butter, filtfilt, iirnotch
+from scipy.io import loadmat, savemat
+from flask import Flask, request, redirect, url_for, send_file
+from io import BytesIO
 from networks_real import build_UNETR
-import timeit
-import matplotlib.pyplot as plt
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'mat'}
 
 app = Flask(__name__)
-
-# Define the upload folder
-UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['result_buffer'] = None
 
-# Bandpass filter function
-def butter_bandpass(lowcut, highcut, fs, order=5):
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
-    return b, a
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = filtfilt(b, a, data)
-    return y
-    
-def notch_filter_ecg(ecg_signal, sampling_freq=250, notch_freq=50, Q=30):
-    nyquist = 0.5 * sampling_freq
-    f0 = notch_freq / nyquist
-    b, a = iirnotch(f0, Q)
-    filtered_ecg = filtfilt(b, a, ecg_signal)
-    return filtered_ecg
+# Check if uploaded file has allowed extension
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Function to process fetal ECG
 def process_fecg(inputs):
-    print('Begin generating the fetal ECG signal...')
+    logging.info('Begin generating the fetal ECG signal...')
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-    net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
 
-    
-    inputs = np.einsum('ijk->jki', inputs)
-    inputs = torch.from_numpy(inputs)
-    inputs = Variable(inputs).float()
-    inputs.to(device)
-    
-    mecg_pred, fecg_pred = net(inputs)
-    return fecg_pred
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'mat'
-
-# Function to process fetal ECG from the uploaded file
-def process_fetal_ecg(file_path):
-    # Load the .mat file
-    mat_data = loadmat(file_path)
-    maternal_ecg = mat_data.get('maecg')
-
-    if maternal_ecg is None:
-        print(f"Error: 'maecg' key not found in the uploaded .mat file {file_path}")
+    # Load the model state to the CPU
+    logging.info('Loading model...')
+    try:
+        net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
+        logging.info('Model loaded successfully.')
+    except Exception as e:
+        logging.error(f'Error loading the model: {e}')
         return None
 
-    # Preparing the maternal ECG for processing
-    maternal_ecg = maternal_ecg[0:992, 0]
-    maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
-    maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
-    maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
-    maternal_ecg = maternal_ecg / np.max(maternal_ecg)
-    maternal_ecg = maternal_ecg * 2
-    maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
-    maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+    inputs = np.einsum('ijk->jki', inputs)
+    inputs = torch.from_numpy(inputs)
+    inputs = Variable(inputs).float().to(device)
 
-    # Process using the UNETR model
-    fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-    fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+    logging.info('Running inference...')
+    try:
+        mecg_pred, fecg_pred = net(inputs)
+        logging.info('Inference completed successfully.')
+    except Exception as e:
+        logging.error(f'Error during inference: {e}')
+        return None
 
-    # Save the result as a MAT file in a bytes buffer (in-memory)
-    result_buffer = io.BytesIO()
-    savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
-    result_buffer.seek(0)
+    return fecg_pred
 
-    # Plot maternal and fetal ECG signals and save the figure
-    plt.figure(figsize=(10, 6))
+# Function to process the uploaded file
+def process_fetal_ecg(file_path):
+    logging.info('Loading maternal ECG from .mat file...')
+    try:
+        mat_data = loadmat(file_path)
+        maternal_ecg = mat_data.get('maecg')
+        if maternal_ecg is None:
+            logging.error('Error: No "maecg" key found in the .mat file.')
+            return None
 
-    # Plot maternal ECG
-    plt.subplot(2, 1, 1)
-    plt.plot(maternal_ecg.flatten(), color='blue')
-    plt.title('Maternal Abdominal ECG Signal')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Amplitude')
+        maternal_ecg = maternal_ecg[0:992, 0]
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1) 
 
-    # Plot fetal ECG prediction
-    plt.subplot(2, 1, 2)
-    plt.plot(fetal_ecg_pred.flatten(), color='green')
-    plt.title('Fetal ECG Prediction')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Amplitude')
+        # Process using the model
+        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
+        if fetal_ecg_pred is None:
+            logging.error('Error during fetal ECG processing.')
+            return None
 
-    # Adjust layout and save the figure
-    plt.tight_layout()
-    plt.savefig('static/fetal_ecg_plot.png')
-    plt.close('all')  # Close all figures
+        fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+        # Save the output to a .mat file in memory
+        result_buffer = BytesIO()
+        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
+        result_buffer.seek(0)
 
-    return result_buffer
+        logging.info('Fetal ECG processing complete.')
+        return result_buffer
 
-# Route for the Results Page
-@app.route('/results')
-def results_page():
-    return '''
-    <!doctype html>
-    <html lang="en">
-    <head>
-        <title>Fetal ECG Extraction Results</title>
-        <!-- CSS and structure -->
-    </head>
-    <body>
-        <div class="container">
-            <h1>Fetal ECG Extraction Results</h1>
-            <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
-            <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.mat">Download Fetal ECG as .mat File</a>
-        </div>
-    </body>
-    </html>
-    '''
+    except Exception as e:
+        logging.error(f"Error processing the file: {e}")
+        return None
 
-# Route to download the extracted fetal ECG .mat file
-@app.route('/download/fetal_ecg_pred')
-def download_file():
-    if 'result_buffer' in app.config:
-        result_buffer = app.config['result_buffer']
-        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
-    return "No file available for download", 404
-
-# Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
@@ -150,23 +97,30 @@ def upload_page():
         if file.filename == '':
             return "No selected file"
         if file and allowed_file(file.filename):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.mat')
-            file.save(file_path)
-            
-            # Process the uploaded file (MAT file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path)
-            if result_buffer is not None:
-                app.config['result_buffer'] = result_buffer
-            
-            # Redirect to results page after processing
-            return redirect(url_for('results_page'))
+            try:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.mat')
+                file.save(file_path)
+
+                # Process the uploaded file (MAT file processing and ECG extraction)
+                logging.info('Processing the uploaded file...')
+                result_buffer = process_fetal_ecg(file_path)
+                if result_buffer is not None:
+                    app.config['result_buffer'] = result_buffer
+                    # Redirect to results page after processing
+                    return redirect(url_for('results_page'))
+                else:
+                    logging.error("Failed to generate fetal ECG.")
+                    return "Failed to process the ECG file. Please check the server logs for more details."
+
+            except Exception as e:
+                logging.error(f"Error processing the file: {e}")
+                return "Internal server error, please check the logs."
 
     return '''
     <!doctype html>
     <html lang="en">
     <head>
         <title>Upload Maternal ECG .mat File</title>
-        <!-- CSS and structure -->
     </head>
     <body>
         <div class="container">
@@ -181,11 +135,17 @@ def upload_page():
     </html>
     '''
 
-if __name__ == '__main__':
-    # Ensure the upload folder exists
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
+@app.route('/results', methods=['GET'])
+def results_page():
+    if app.config['result_buffer'] is not None:
+        return send_file(
+            app.config['result_buffer'],
+            as_attachment=True,
+            download_name='fetal_ecg_pred.mat',
+            mimetype='application/x-matlab-data'
+        )
+    else:
+        return "No result available. Please upload and process an ECG file first."
 
-    # Run the Flask server using the dynamic port provided by Render
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=10000)
