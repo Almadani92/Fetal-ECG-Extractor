@@ -44,7 +44,8 @@ def process_fecg(inputs):
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-    net.load_state_dict(torch.load('saved_model5_japan.pkl'))
+    net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
+
     
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
