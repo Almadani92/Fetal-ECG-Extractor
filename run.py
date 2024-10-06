@@ -147,5 +147,11 @@ def results_page():
     else:
         return "No result available. Please upload and process an ECG file first."
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+if __name__ == '__main__':
+    # Ensure the upload folder exists
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+
+    # Run the Flask server using the dynamic port provided by Render
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
