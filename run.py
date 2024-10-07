@@ -31,15 +31,7 @@ def process_fecg(inputs):
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-
-    # Load the model state to the CPU
-    logging.info('Loading model...')
-    try:
-        net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
-        logging.info('Model loaded successfully.')
-    except Exception as e:
-        logging.error(f'Error loading the model: {e}')
-        return None
+    net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
 
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
