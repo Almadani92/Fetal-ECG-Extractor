@@ -27,21 +27,21 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Function to download model from Google Drive
-def download_model_from_drive(drive_file_id, destination):
-    # Construct the download URL
-    download_url = f"https://drive.google.com/uc?export=download&id={drive_file_id}"
-    session = requests.Session()
+def download_model_from_onedrive(onedrive_link, destination):
+    # Direct download link from OneDrive
+    response = requests.get(onedrive_link, stream=True)
+    
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Save the model to the destination file
+        with open(destination, "wb") as f:
+            for chunk in response.iter_content(1024):
+                if chunk:
+                    f.write(chunk)
+        print("Model downloaded successfully.")
+    else:
+        print(f"Failed to download model. Status code: {response.status_code}")
 
-    # Initial request to get the confirmation token (if needed)
-    response = session.get(download_url, stream=True)
-    token = get_confirm_token(response)
-
-    if token:
-        download_url = f"https://drive.google.com/uc?export=download&id={drive_file_id}&confirm={token}"
-        response = session.get(download_url, stream=True)
-
-    # Save the model to the destination file
-    save_response_content(response, destination)
 
 def get_confirm_token(response):
     for key, value in response.cookies.items():
@@ -66,13 +66,14 @@ def process_fecg(inputs):
     net.to(device)
 
 
-    # Call the download function before loading the model
+    # OneDrive link (modified for direct download)
+    onedrive_link = "https://api.onedrive.com/v1.0/shares/u!6a09f62f6ff05ffc/root/content"
     model_file_path = 'saved_model5_japan.pkl'
-    google_drive_file_id = '19x5eOrK33Ig33c_uickpSazo2apFkD3s'
     
-
-    print("Downloading the model from Google Drive...")
-    download_model_from_drive(google_drive_file_id, model_file_path)
+    # Download the model if it doesn't exist
+    if not os.path.exists(model_file_path):
+        print("Downloading the model from OneDrive...")
+        download_model_from_onedrive(onedrive_link, model_file_path)
     
     # Load the model
     print("Loading the model...")
