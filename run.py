@@ -9,7 +9,7 @@ from io import BytesIO
 from networks_real import build_UNETR
 import requests
 
-# Set up logging
+# Set up loggin
 logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
