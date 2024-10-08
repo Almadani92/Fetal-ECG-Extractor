@@ -7,6 +7,7 @@ from scipy.io import loadmat, savemat
 from flask import Flask, request, redirect, url_for, send_file
 from io import BytesIO
 from networks_real import build_UNETR
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -25,15 +26,50 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Function to download model from Google Drive
+def download_model_from_drive(drive_file_id, destination):
+    # Construct the download URL
+    download_url = f"https://drive.google.com/uc?id={drive_file_id}"
+    
+    # Send a GET request to download the file
+    response = requests.get(download_url, stream=True)
+    
+    # Check if the request was successful
+    if response.status_code == 200:
+        with open(destination, 'wb') as f:
+            f.write(response.content)
+        print(f"Model downloaded successfully to {destination}")
+    else:
+        print(f"Failed to download the model. Status code: {response.status_code}")
+        raise Exception("Model download failed")
+
+
 # Function to process fetal ECG
 def process_fecg(inputs):
     logging.info('Begin generating the fetal ECG signal...')
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-    net.load_state_dict(torch.load('saved_model5_japan.pkl', map_location=torch.device('cpu')))
 
 
+    # Call the download function before loading the model
+    model_file_path = 'saved_model5_japan.pkl'
+    
+    # Google Drive file ID for your model
+    google_drive_file_id = '19x5eOrK33Ig33c_uickpSazo2apFkD3s'
+    
+    # Download the model if it doesn't exist
+    #if not os.path.exists(model_file_path):
+    print("Downloading the model from Google Drive...")
+    download_model_from_drive(google_drive_file_id, model_file_path)
+    
+    # Load the model
+    print("Loading the model...")
+    try:
+        net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
+        print("Model loaded successfully.")
+    except Exception as e:
+        print(f"Error loading the model: {e}")
 
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
