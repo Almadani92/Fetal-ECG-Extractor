@@ -29,19 +29,33 @@ def allowed_file(filename):
 # Function to download model from Google Drive
 def download_model_from_drive(drive_file_id, destination):
     # Construct the download URL
-    download_url = f"https://drive.google.com/uc?id={drive_file_id}"
-    
-    # Send a GET request to download the file
-    response = requests.get(download_url, stream=True)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        with open(destination, 'wb') as f:
-            f.write(response.content)
-        print(f"Model downloaded successfully to {destination}")
-    else:
-        print(f"Failed to download the model. Status code: {response.status_code}")
-        raise Exception("Model download failed")
+    download_url = f"https://drive.google.com/uc?export=download&id={drive_file_id}"
+    session = requests.Session()
+
+    # Initial request to get the confirmation token (if needed)
+    response = session.get(download_url, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        download_url = f"https://drive.google.com/uc?export=download&id={drive_file_id}&confirm={token}"
+        response = session.get(download_url, stream=True)
+
+    # Save the model to the destination file
+    save_response_content(response, destination)
+
+def get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
+
+def save_response_content(response, destination):
+    CHUNK_SIZE = 32768
+
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(CHUNK_SIZE):
+            if chunk:  # Filter out keep-alive new chunks
+                f.write(chunk)
 
 
 # Function to process fetal ECG
@@ -54,12 +68,9 @@ def process_fecg(inputs):
 
     # Call the download function before loading the model
     model_file_path = 'saved_model5_japan.pkl'
-    
-    # Google Drive file ID for your model
     google_drive_file_id = '19x5eOrK33Ig33c_uickpSazo2apFkD3s'
     
-    # Download the model if it doesn't exist
-    #if not os.path.exists(model_file_path):
+
     print("Downloading the model from Google Drive...")
     download_model_from_drive(google_drive_file_id, model_file_path)
     
