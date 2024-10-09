@@ -64,25 +64,7 @@ def process_fecg(inputs):
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-
-
-    # OneDrive link (modified for direct download)
-    onedrive_link = "https://api.onedrive.com/v1.0/shares/u!6a09f62f6ff05ffc/root/content"
-    model_file_path = 'saved_model5_japan.pkl'
-    
-    # Download the model if it doesn't exist
-    if not os.path.exists(model_file_path):
-        print("Downloading the model from OneDrive...")
-        download_model_from_onedrive(onedrive_link, model_file_path)
-    
-    # Load the model
-    print("Loading the model...")
-    try:
-        net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
-        print("Model loaded successfully.")
-    except Exception as e:
-        print(f"Error loading the model: {e}")
-
+    net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
     inputs = Variable(inputs).float().to(device)
