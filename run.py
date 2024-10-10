@@ -68,6 +68,11 @@ def process_fecg(inputs):
     # Download the model and save it locally
     model_file_path = "saved_model5_japan.pkl"
     urllib.request.urlretrieve(model_url, model_file_path)
+    # Check file size to ensure it's downloaded properly
+    if os.path.exists(model_file_path):
+        print(f"Model file size: {os.path.getsize(model_file_path)} bytes")
+    else:
+        print("Model file not downloaded.")
     net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
