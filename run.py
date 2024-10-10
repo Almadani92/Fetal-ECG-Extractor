@@ -8,6 +8,7 @@ from flask import Flask, request, redirect, url_for, send_file
 from io import BytesIO
 from networks_real import build_UNETR
 import requests
+import urllib.request
 
 # Set up loggin
 logging.basicConfig(level=logging.INFO)
@@ -59,7 +60,14 @@ def process_fecg(inputs):
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-    model_file_path = "saved_model5_japan.pkl" 
+
+    
+    # URL of your model in Dropbox or another storage
+    model_url = "https://www.dropbox.com/scl/fi/qsev17tj006jwg2iv499k/saved_model5_japan.pkl?dl=1"
+    
+    # Download the model and save it locally
+    model_file_path = "saved_model5_japan.pkl"
+    urllib.request.urlretrieve(model_url, model_file_path)
     net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
