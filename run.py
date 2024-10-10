@@ -59,21 +59,7 @@ def process_fecg(inputs):
     device = torch.device("cpu")
     net = build_UNETR()
     net.to(device)
-    # Direct download link from Dropbox
-    model_url = "https://dl.dropboxusercontent.com/scl/fi/qsev17tj006jwg2iv499k/saved_model5_japan.pkl?rlkey=mte6osrzrg3ys6ck8lgfiji9f&st=mc6u65it"
-    model_file_path = "saved_model5_japan.pkl"
-    
-    # Download and load the model
-    download_model(model_url, model_file_path)
-    
-    # Load the model
-    try:
-        print("Loading the model...")
-        net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
-        print("Model loaded successfully!")
-    except Exception as e:
-        print(f"Error loading the model: {e}")
-
+    net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
     inputs = Variable(inputs).float().to(device)
