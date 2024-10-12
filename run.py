@@ -121,6 +121,15 @@ def process_fetal_ecg(file_path):
         logging.error(f"Error processing the file: {e}")
         return None
 
+# Route to download the extracted fetal ECG .mat file
+@app.route('/download/fetal_ecg_pred')
+def download_file():
+    if 'result_buffer' in app.config:
+        result_buffer = app.config['result_buffer']
+        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
+    return "No file available for download", 404
+
+# Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
@@ -130,30 +139,45 @@ def upload_page():
         if file.filename == '':
             return "No selected file"
         if file and allowed_file(file.filename):
-            try:
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.mat')
-                file.save(file_path)
-
-                # Process the uploaded file (MAT file processing and ECG extraction)
-                logging.info('Processing the uploaded file...')
-                result_buffer = process_fetal_ecg(file_path)
-                if result_buffer is not None:
-                    app.config['result_buffer'] = result_buffer
-                    # Redirect to results page after processing
-                    return redirect(url_for('results_page'))
-                else:
-                    logging.error("Failed to generate fetal ECG.")
-                    return "Failed to process the ECG file. Please check the server logs for more details."
-
-            except Exception as e:
-                logging.error(f"Error processing the file: {e}")
-                return "Internal server error, please check the logs."
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.mat')
+            file.save(file_path)
+            
+            # Process the uploaded file (MAT file processing and ECG extraction)
+            result_buffer = process_fetal_ecg(file_path)
+            if result_buffer is not None:
+                app.config['result_buffer'] = result_buffer
+            
+            # Redirect to results page after processing
+            return redirect(url_for('results_page'))
 
     return '''
     <!doctype html>
     <html lang="en">
     <head>
         <title>Upload Maternal ECG .mat File</title>
+        <style>
+            body {
+                background-image: url('/static/full_pipeline.png');
+                background-size: contain; /* Ensure the image fits */
+                background-position: center; /* Center the image */
+                background-repeat: no-repeat; /* Prevent duplication */
+                font-family: Arial, sans-serif;
+                color: #fff;
+                text-align: center;
+            }
+            .container {
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 20px;
+                border-radius: 10px;
+                margin-top: 300px;
+                display: inline-block;
+            }
+            input[type="file"], input[type="submit"] {
+                margin: 10px;
+                padding: 10px;
+                font-size: 1em;
+            }
+        </style>
     </head>
     <body>
         <div class="container">
@@ -167,18 +191,66 @@ def upload_page():
     </body>
     </html>
     '''
-
-@app.route('/results', methods=['GET'])
+    
+# Route for the Results Page
+@app.route('/results')
 def results_page():
-    if app.config['result_buffer'] is not None:
-        return send_file(
-            app.config['result_buffer'],
-            as_attachment=True,
-            download_name='fetal_ecg_pred.mat',
-            mimetype='application/x-matlab-data'
-        )
-    else:
-        return "No result available. Please upload and process an ECG file first."
+    return '''
+    <!doctype html>
+    <html lang="en">
+    <head>
+        <title>Fetal ECG Extraction Results</title>
+        <style>
+            body {
+                background-image: url('/static/full_pipeline.png');
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                font-family: Arial, sans-serif;
+                color: #fff;
+                text-align: center;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                background-attachment: fixed;
+            }
+            .container {
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 20px;
+                border-radius: 10px;
+                margin-top: 50px;
+                display: inline-block;
+            }
+            img {
+                max-width: 90%;
+                height: auto;
+                margin: 20px 0;
+            }
+            .download-button {
+                padding: 10px 20px;
+                margin: 20px;
+                background-color: #28a745;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                font-size: 1em;
+            }
+            .download-button:hover {
+                background-color: #218838;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Fetal ECG Extraction Results</h1>
+            <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
+            <br>
+            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.mat">Download Fetal ECG as .mat File</a>
+            <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
+        </div>
+    </body>
+    </html>
+    '''
 
 if __name__ == '__main__':
     # Ensure the upload folder exists
