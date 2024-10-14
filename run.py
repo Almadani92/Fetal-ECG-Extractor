@@ -257,7 +257,7 @@ def results_page():
             <h1>Fetal ECG Extraction Results</h1>
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
             <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.mat">Download Fetal ECG as .mat File</a>
+            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.csv">Download Fetal ECG as .csv File</a>
             <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
         </div>
     </body>
