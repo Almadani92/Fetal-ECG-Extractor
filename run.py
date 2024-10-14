@@ -143,7 +143,7 @@ def process_fetal_ecg(file_path):
         plt.close('all')  # Close all figures
 
         # Save the output to a CSV file on disk
-        combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
+        combined_data = np.column_stack((fetal_ecg_pred, maternal_ecg))
         
         output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
         np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
