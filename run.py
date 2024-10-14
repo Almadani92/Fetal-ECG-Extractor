@@ -133,13 +133,13 @@ def process_fetal_ecg(file_path):
         logging.error(f"Error processing the file: {e}")
         return None
 
-# Route to download the extracted fetal ECG .mat file
+# Route to download the extracted fetal ECG .csv file
 @app.route('/download/fetal_ecg_pred')
 def download_file():
-    if 'result_buffer' in app.config and app.config['result_buffer'] is not None:
-        result_buffer = app.config['result_buffer']
-        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
+    if app.config['result_buffer'] is not None:
+        return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
     return "No file available for download", 404
+
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
