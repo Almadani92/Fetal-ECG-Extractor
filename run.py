@@ -3,9 +3,7 @@ import logging
 import torch
 import numpy as np
 import pandas as pd
-from torch.autograd import Variable
-from flask import Flask, request, redirect, url_for, send_from_directory
-from io import BytesIO
+from flask import Flask, request, redirect, url_for, send_file
 from networks_real import build_UNETR
 import requests
 import urllib.request
@@ -21,7 +19,7 @@ ALLOWED_EXTENSIONS = {'csv'}
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
-app.config['result_buffer'] = None
+app.config['result_filename'] = None
 
 # Ensure upload and results directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -78,7 +76,7 @@ def process_fecg(inputs):
     
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
-    inputs = Variable(inputs).float().to(device)
+    inputs = torch.autograd.Variable(inputs).float().to(device)
 
     logging.info('Running inference...')
     try:
@@ -131,6 +129,9 @@ def process_fetal_ecg(file_path):
         np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
         logging.info(f"CSV file saved to {output_filename}")
         
+        # Save filename to app config to access later in the download route
+        app.config['result_filename'] = output_filename
+        
         return output_filename
 
     except Exception as e:
@@ -141,8 +142,12 @@ def process_fetal_ecg(file_path):
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     try:
-        # Serve the file from the results folder
-        return send_from_directory(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv', as_attachment=True)
+        if app.config['result_filename']:
+            logging.info(f"Serving file: {app.config['result_filename']}")
+            return send_file(app.config['result_filename'], as_attachment=True)
+        else:
+            logging.error("No file available for download.")
+            return "No file available for download", 404
     except Exception as e:
         logging.error(f"Error serving the file: {e}")
         return "No file available for download", 404
