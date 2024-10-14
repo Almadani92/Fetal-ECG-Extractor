@@ -96,8 +96,8 @@ def process_fetal_ecg(file_path):
         
         # Assume the maternal ECG is in the first column
         maternal_ecg_all_sig = df.iloc[:, 0].values
-        kh = np.int32(maternal_ecg_all_sig.shape[0]/992)
-        maternal_ecg_all_sig = maternal_ecg_all_sig[:992*kh]
+        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
+        maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
         for i in range(kh):
             maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
@@ -118,15 +118,18 @@ def process_fetal_ecg(file_path):
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
         
-        # Save the output to a .mat file in memory
+        # Save the output to a .csv file in memory
         # Concatenate the fetal ECG and processed maternal ECG as two columns
-        combined_data = np.hstack((maternal_ecg_all_sig, fecg_pred_all_sig))
+        combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
         
         result_buffer = BytesIO()
         np.savetxt(result_buffer, combined_data, delimiter=",", header="Maternal Abdominal ECG, Extracted fetal ECG", comments="")
         result_buffer.seek(0)
 
         logging.info('Fetal ECG processing complete.')
+        
+        # Assign result buffer to the global app config for later access
+        app.config['result_buffer'] = result_buffer
         return result_buffer
 
     except Exception as e:
@@ -139,7 +142,6 @@ def download_file():
     if app.config['result_buffer'] is not None:
         return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
     return "No file available for download", 404
-
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
