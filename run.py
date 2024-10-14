@@ -122,14 +122,18 @@ def process_fetal_ecg(file_path):
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
 
         # Save the output to a CSV file on disk
-        # Concatenate the fetal ECG and processed maternal ECG as two columns
         combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
         
         output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
         np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
-        logging.info(f"CSV file saved to {output_filename}")
         
-        # Save filename to app config to access later in the download route
+        logging.info(f"CSV file saved to {output_filename}")  # Log file path
+        if not os.path.exists(output_filename):
+            logging.error(f"File does not exist: {output_filename}")
+        else:
+            logging.info(f"File exists and ready for download.")
+        
+        # Save filename to app config for download access
         app.config['result_filename'] = output_filename
         
         return output_filename
@@ -151,6 +155,7 @@ def download_file():
     except Exception as e:
         logging.error(f"Error serving the file: {e}")
         return "No file available for download", 404
+
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
