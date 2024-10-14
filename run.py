@@ -120,6 +120,27 @@ def process_fetal_ecg(file_path):
 
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
+        # Plot maternal and fetal ECG signals and save the figure
+        plt.figure(figsize=(10, 6))
+    
+        # Plot maternal ECG
+        plt.subplot(2, 1, 1)
+        plt.plot(maternal_ecg.flatten(), color='blue')
+        plt.title('Maternal Abdominal ECG Signal')
+        plt.xlabel('Sample Index')
+        plt.ylabel('Amplitude')
+    
+        # Plot fetal ECG prediction
+        plt.subplot(2, 1, 2)
+        plt.plot(fetal_ecg_pred.flatten(), color='green')
+        plt.title('Fetal ECG Prediction')
+        plt.xlabel('Sample Index')
+        plt.ylabel('Amplitude')
+    
+        # Adjust layout and save the figure
+        plt.tight_layout()
+        plt.savefig('static/fetal_ecg_plot.png')
+        plt.close('all')  # Close all figures
 
         # Save the output to a CSV file on disk
         combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
