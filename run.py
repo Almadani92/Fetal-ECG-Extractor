@@ -49,14 +49,14 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def download_model(url, destination):
-    print("Downloading the model from Dropbox...")
+    logging.info("Downloading the model from Dropbox...")
     response = requests.get(url, stream=True)
     if response.status_code == 200:
         with open(destination, 'wb') as f:
             f.write(response.content)
-        print("Model downloaded successfully!")
+        logging.info("Model downloaded successfully!")
     else:
-        print(f"Error downloading the model: {response.status_code}")
+        logging.error(f"Error downloading the model: {response.status_code}")
 
 # Function to process fetal ECG
 def process_fecg(inputs):
@@ -118,18 +118,19 @@ def process_fetal_ecg(file_path):
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
         
-        # Save the output to a .csv file in memory
+        # Save the output to a CSV file in memory
         # Concatenate the fetal ECG and processed maternal ECG as two columns
         combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
         
         result_buffer = BytesIO()
-        np.savetxt(result_buffer, combined_data, delimiter=",", header="Maternal Abdominal ECG, Extracted fetal ECG", comments="")
+        np.savetxt(result_buffer, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
         result_buffer.seek(0)
 
         logging.info('Fetal ECG processing complete.')
-        
-        # Assign result buffer to the global app config for later access
+
+        # Assign result buffer to app config for later access
         app.config['result_buffer'] = result_buffer
+        logging.info("Result buffer is set.")
         return result_buffer
 
     except Exception as e:
@@ -140,7 +141,9 @@ def process_fetal_ecg(file_path):
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     if app.config['result_buffer'] is not None:
+        logging.info("Downloading the result buffer...")
         return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
+    logging.error("No file available for download.")
     return "No file available for download", 404
 
 # Route for Upload Page
@@ -148,18 +151,22 @@ def download_file():
 def upload_page():
     if request.method == 'POST':
         if 'file' not in request.files:
+            logging.error("No file part in the request")
             return "No file part in the request"
         file = request.files['file']
         if file.filename == '':
+            logging.error("No selected file")
             return "No selected file"
         if file and allowed_file(file.filename):
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.csv')
             file.save(file_path)
-            
+            logging.info("File uploaded and saved.")
+
             # Process the uploaded file (CSV file processing and ECG extraction)
             result_buffer = process_fetal_ecg(file_path)
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
+                logging.info("Redirecting to results page.")
             
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
@@ -205,7 +212,7 @@ def upload_page():
     </body>
     </html>
     '''
-    
+
 # Route for the Results Page
 @app.route('/results')
 def results_page():
