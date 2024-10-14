@@ -106,6 +106,7 @@ def process_fetal_ecg(file_path):
             maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
             maternal_ecg = maternal_ecg / np.max(maternal_ecg)
             maternal_ecg = maternal_ecg * 2
+
             maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
             maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
 
@@ -117,7 +118,7 @@ def process_fetal_ecg(file_path):
 
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
-        
+
         # Save the output to a CSV file in memory
         # Concatenate the fetal ECG and processed maternal ECG as two columns
         combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
@@ -165,8 +166,9 @@ def upload_page():
             # Process the uploaded file (CSV file processing and ECG extraction)
             result_buffer = process_fetal_ecg(file_path)
             if result_buffer is not None:
+                logging.info("Result buffer is being set.")
                 app.config['result_buffer'] = result_buffer
-                logging.info("Redirecting to results page.")
+                logging.info("Result buffer set successfully.")
             
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
