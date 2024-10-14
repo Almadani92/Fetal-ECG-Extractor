@@ -131,7 +131,7 @@ def process_fetal_ecg(file_path):
 
         # Assign result buffer to app config for later access
         app.config['result_buffer'] = result_buffer
-        logging.info("Result buffer is set.")
+        logging.info("Result buffer is set. Contents: %s", result_buffer.getvalue())  # Add debugging to see buffer contents
         return result_buffer
 
     except Exception as e:
@@ -144,7 +144,8 @@ def download_file():
     if app.config['result_buffer'] is not None:
         logging.info("Downloading the result buffer...")
         return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
-    logging.error("No file available for download.")
+    else:
+        logging.error("No file available for download.")
     return "No file available for download", 404
 
 # Route for Upload Page
