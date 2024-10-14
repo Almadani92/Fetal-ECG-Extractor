@@ -15,14 +15,17 @@ from scipy.signal import butter, filtfilt, iirnotch
 logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
+RESULTS_FOLDER = 'results'
 ALLOWED_EXTENSIONS = {'csv'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
 app.config['result_buffer'] = None
 
-# Ensure upload directory exists
+# Ensure upload and results directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # Bandpass filter function
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -114,24 +117,23 @@ def process_fetal_ecg(file_path):
             return None
 
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-        # Save the output to a .mat file in memory
-        result_buffer = BytesIO()
-        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
-        result_buffer.seek(0)
+
+        # Save the output to a .csv file
+        output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_ecg_pred.csv')
+        pd.DataFrame(fetal_ecg_pred).to_csv(output_filename, header=False, index=False)
 
         logging.info('Fetal ECG processing complete.')
-        return result_buffer
+        return output_filename
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
 
-# Route to download the extracted fetal ECG .mat file
+# Route to download the extracted fetal ECG .csv file
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     if 'result_buffer' in app.config and app.config['result_buffer'] is not None:
-        result_buffer = app.config['result_buffer']
-        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
+        return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
     return "No file available for download", 404
 
 # Route for Upload Page
@@ -148,9 +150,9 @@ def upload_page():
             file.save(file_path)
             
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path)
-            if result_buffer is not None:
-                app.config['result_buffer'] = result_buffer
+            output_file = process_fetal_ecg(file_path)
+            if output_file is not None:
+                app.config['result_buffer'] = output_file
             
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
@@ -196,7 +198,7 @@ def upload_page():
     </body>
     </html>
     '''
-    
+
 # Route for the Results Page
 @app.route('/results')
 def results_page():
@@ -250,8 +252,7 @@ def results_page():
             <h1>Fetal ECG Extraction Results</h1>
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
             <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.mat">Download Fetal ECG as .mat File</a>
-            <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
+            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.csv">Download Fetal ECG as .csv File</a>
         </div>
     </body>
     </html>
@@ -261,6 +262,10 @@ if __name__ == '__main__':
     # Ensure the upload folder exists
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
+
+    # Ensure the results folder exists
+    if not os.path.exists(RESULTS_FOLDER):
+        os.makedirs(RESULTS_FOLDER)
 
     # Run the Flask server using the dynamic port provided by Render or Railway
     port = int(os.environ.get('PORT', 5000))
