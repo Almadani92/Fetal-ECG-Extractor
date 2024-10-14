@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch.autograd import Variable
-from flask import Flask, request, redirect, url_for, send_file
+from flask import Flask, request, redirect, url_for, send_from_directory
 from io import BytesIO
 from networks_real import build_UNETR
 import requests
@@ -15,14 +15,17 @@ from scipy.signal import butter, filtfilt, iirnotch
 logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
+RESULTS_FOLDER = 'results'  # Folder to save the CSV files
 ALLOWED_EXTENSIONS = {'csv'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
 app.config['result_buffer'] = None
 
-# Ensure upload directory exists
+# Ensure upload and results directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # Bandpass filter function
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -87,7 +90,7 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-# Function to process the uploaded CSV file
+# Function to process the uploaded CSV file and save to disk
 def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     try:
@@ -99,6 +102,7 @@ def process_fetal_ecg(file_path):
         kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
+
         for i in range(kh):
             maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
             maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
@@ -119,20 +123,15 @@ def process_fetal_ecg(file_path):
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
 
-        # Save the output to a CSV file in memory
+        # Save the output to a CSV file on disk
         # Concatenate the fetal ECG and processed maternal ECG as two columns
         combined_data = np.column_stack((maternal_ecg_all_sig, fecg_pred_all_sig))
         
-        result_buffer = BytesIO()
-        np.savetxt(result_buffer, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
-        result_buffer.seek(0)
-
-        logging.info('Fetal ECG processing complete.')
-
-        # Assign result buffer to app config for later access
-        app.config['result_buffer'] = result_buffer
-        logging.info("Result buffer is set. Contents: %s", result_buffer.getvalue())  # Add debugging to see buffer contents
-        return result_buffer
+        output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
+        np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
+        logging.info(f"CSV file saved to {output_filename}")
+        
+        return output_filename
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
@@ -141,12 +140,12 @@ def process_fetal_ecg(file_path):
 # Route to download the extracted fetal ECG .csv file
 @app.route('/download/fetal_ecg_pred')
 def download_file():
-    if app.config['result_buffer'] is not None:
-        logging.info("Downloading the result buffer...")
-        return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
-    else:
-        logging.error("No file available for download.")
-    return "No file available for download", 404
+    try:
+        # Serve the file from the results folder
+        return send_from_directory(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv', as_attachment=True)
+    except Exception as e:
+        logging.error(f"Error serving the file: {e}")
+        return "No file available for download", 404
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
@@ -165,11 +164,9 @@ def upload_page():
             logging.info("File uploaded and saved.")
 
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path)
-            if result_buffer is not None:
-                logging.info("Result buffer is being set.")
-                app.config['result_buffer'] = result_buffer
-                logging.info("Result buffer set successfully.")
+            output_filename = process_fetal_ecg(file_path)
+            if output_filename is not None:
+                logging.info(f"File processed and saved as {output_filename}")
             
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
@@ -277,9 +274,11 @@ def results_page():
     '''
 
 if __name__ == '__main__':
-    # Ensure the upload folder exists
+    # Ensure the upload and results folders exist
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
+    if not os.path.exists(RESULTS_FOLDER):
+        os.makedirs(RESULTS_FOLDER)
 
     # Run the Flask server using the dynamic port provided by Render or Railway
     port = int(os.environ.get('PORT', 5000))
