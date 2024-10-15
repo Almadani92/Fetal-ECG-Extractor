@@ -126,16 +126,22 @@ def process_fetal_ecg(file_path):
         output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
         np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
-        # Plot and save the last loop of maternal ECG and fetal ECG prediction
-        plt.figure(figsize=(10, 6))
-        plt.plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
-        plt.plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
-        plt.xlabel('Samples')
-        plt.ylabel('Amplitude')
-        plt.title('Maternal ECG vs Fetal ECG Prediction')
-        plt.legend()
+        # Plot subplots for maternal and fetal ECG
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+        ax[0].plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
+        ax[0].set_title("Maternal ECG")
+        ax[0].set_xlabel("Samples")
+        ax[0].set_ylabel("Amplitude")
+        ax[0].legend()
 
-        # Save the plot in the static folder to display it in the results page
+        ax[1].plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
+        ax[1].set_title("Fetal ECG Prediction")
+        ax[1].set_xlabel("Samples")
+        ax[1].set_ylabel("Amplitude")
+        ax[1].legend()
+
+        # Adjust layout and save the plot in the static folder
+        plt.tight_layout()
         plot_path = os.path.join('static', 'fetal_ecg_plot.png')
         plt.savefig(plot_path)
         plt.close()
@@ -146,6 +152,7 @@ def process_fetal_ecg(file_path):
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
+
 
 
 
