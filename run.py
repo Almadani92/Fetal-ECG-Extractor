@@ -114,7 +114,7 @@ def process_fetal_ecg(file_path):
             return None
 
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-
+        fetal_ecg_pred = fetal_ecg_pred.squeeze()  # Remove any unnecessary dimensions
         # Save the output to a .csv file
         output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_ecg_pred.csv')
         np.savetxt(output_csv_path, fetal_ecg_pred, delimiter=",")
