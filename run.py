@@ -95,36 +95,46 @@ def process_fetal_ecg(file_path):
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
         
         # Assume the maternal ECG is in the first column
-        maternal_ecg = df.iloc[:, 0].values
         
-        # Preprocess ECG signal: limit to first 992 samples and expand dimensions
-        maternal_ecg = maternal_ecg[:992]
-        maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
-        maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
-        maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
-        maternal_ecg = maternal_ecg / np.max(maternal_ecg)
-        maternal_ecg = maternal_ecg * 2
-        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
-        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+        maternal_ecg_all_sig = df.iloc[:, 0].values
+        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
+        maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
+        fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
 
-        # Process using the model
-        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-        if fetal_ecg_pred is None:
-            logging.error('Error during fetal ECG processing.')
-            return None
+        for i in range(kh):
+            maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
+            maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
+            maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
+            maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
+            maternal_ecg = maternal_ecg / np.max(maternal_ecg)
+            maternal_ecg = maternal_ecg * 2
 
-        fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-        fetal_ecg_pred = fetal_ecg_pred.squeeze()  # Remove any unnecessary dimensions
-        maternal_ecg = maternal_ecg.squeeze()
+            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
+            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+
+            # Process using the model
+            fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
+            if fetal_ecg_pred is None:
+                logging.error('Error during fetal ECG processing.')
+                return None
+
+            fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+            fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred.squeeze() 
+        
+
         # Stack maternal_ecg and fetal_ecg_pred as two columns
-        combined_ecg = np.column_stack((maternal_ecg, fetal_ecg_pred))
+        combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
 
         # Save the combined signals to a .csv file
         output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
-        np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Maternal_abdominal_ECG,Fetal_ECG", comments='')
+        np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
         logging.info('Maternal and fetal ECG processing complete.')
         return output_csv_path
+
+    except Exception as e:
+        logging.error(f"Error processing the file: {e}")
+        return None
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
