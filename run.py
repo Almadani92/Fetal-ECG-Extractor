@@ -3,9 +3,9 @@ import logging
 import torch
 import numpy as np
 import pandas as pd
+from torch.autograd import Variable
 from flask import Flask, request, redirect, url_for, send_file
 from io import BytesIO
-from scipy.io import savemat
 from networks_real import build_UNETR
 import requests
 import urllib.request
@@ -19,9 +19,9 @@ ALLOWED_EXTENSIONS = {'csv'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['result_buffer'] = None  # In-memory result buffer
+app.config['result_buffer'] = None
 
-# Ensure the upload directory exists
+# Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Bandpass filter function
@@ -48,6 +48,16 @@ def notch_filter_ecg(ecg_signal, sampling_freq=250, notch_freq=50, Q=30):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def download_model(url, destination):
+    print("Downloading the model from Dropbox...")
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        with open(destination, 'wb') as f:
+            f.write(response.content)
+        print("Model downloaded successfully!")
+    else:
+        print(f"Error downloading the model: {response.status_code}")
+
 # Function to process fetal ECG
 def process_fecg(inputs):
     logging.info('Begin generating the fetal ECG signal...')
@@ -65,7 +75,7 @@ def process_fecg(inputs):
     
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
-    inputs = torch.autograd.Variable(inputs).float().to(device)
+    inputs = Variable(inputs).float().to(device)
 
     logging.info('Running inference...')
     try:
@@ -77,59 +87,116 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-# Function to process fetal ECG from the uploaded file
+# Function to process the uploaded CSV file
 def process_fetal_ecg(file_path):
-    # Load the .mat file
-    mat_data = loadmat(file_path)
-    maternal_ecg = mat_data.get('maecg')
+    logging.info('Loading maternal ECG from .csv file...')
+    try:
+        # Load CSV as a dataframe
+        df = pd.read_csv(file_path, header=None)  # No header in the CSV file
+        
+        # Assume the maternal ECG is in the first column
+        maternal_ecg = df.iloc[:, 0].values
+        
+        # Preprocess ECG signal: limit to first 992 samples and expand dimensions
+        maternal_ecg = maternal_ecg[:992]
+        maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
+        maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
+        maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
+        maternal_ecg = maternal_ecg / np.max(maternal_ecg)
+        maternal_ecg = maternal_ecg * 2
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
 
-    if maternal_ecg is None:
-        print(f"Error: 'maecg' key not found in the uploaded .mat file {file_path}")
+        # Process using the model
+        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
+        if fetal_ecg_pred is None:
+            logging.error('Error during fetal ECG processing.')
+            return None
+
+        fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+        # Save the output to a .mat file in memory
+        result_buffer = BytesIO()
+        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
+        result_buffer.seek(0)
+
+        logging.info('Fetal ECG processing complete.')
+        return result_buffer
+
+    except Exception as e:
+        logging.error(f"Error processing the file: {e}")
         return None
 
-    # Preparing the maternal ECG for processing
-    maternal_ecg = maternal_ecg[0:992, 0]
-    maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
-    maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
-    maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
-    maternal_ecg = maternal_ecg / np.max(maternal_ecg)
-    maternal_ecg = maternal_ecg * 2
-    maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
-    maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+# Route to download the extracted fetal ECG .mat file
+@app.route('/download/fetal_ecg_pred')
+def download_file():
+    if 'result_buffer' in app.config and app.config['result_buffer'] is not None:
+        result_buffer = app.config['result_buffer']
+        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
+    return "No file available for download", 404
 
-    # Process using the UNETR model
-    fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-    fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+# Route for Upload Page
+@app.route('/', methods=['GET', 'POST'])
+def upload_page():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return "No file part in the request"
+        file = request.files['file']
+        if file.filename == '':
+            return "No selected file"
+        if file and allowed_file(file.filename):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.csv')
+            file.save(file_path)
+            
+            # Process the uploaded file (CSV file processing and ECG extraction)
+            result_buffer = process_fetal_ecg(file_path)
+            if result_buffer is not None:
+                app.config['result_buffer'] = result_buffer
+            
+            # Redirect to results page after processing
+            return redirect(url_for('results_page'))
 
-    # Save the result as a MAT file in a bytes buffer (in-memory)
-    result_buffer = io.BytesIO()
-    savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
-    result_buffer.seek(0)
-
-    # Plot maternal and fetal ECG signals and save the figure
-    plt.figure(figsize=(10, 6))
-
-    # Plot maternal ECG
-    plt.subplot(2, 1, 1)
-    plt.plot(maternal_ecg.flatten(), color='blue')
-    plt.title('Maternal Abdominal ECG Signal')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Amplitude')
-
-    # Plot fetal ECG prediction
-    plt.subplot(2, 1, 2)
-    plt.plot(fetal_ecg_pred.flatten(), color='green')
-    plt.title('Fetal ECG Prediction')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Amplitude')
-
-    # Adjust layout and save the figure
-    plt.tight_layout()
-    plt.savefig('static/fetal_ecg_plot.png')
-    plt.close('all')  # Close all figures
-
-    return result_buffer
-
+    return '''
+    <!doctype html>
+    <html lang="en">
+    <head>
+        <title>Upload Maternal ECG .csv File</title>
+        <style>
+            body {
+                background-image: url('/static/full_pipeline.png');
+                background-size: contain; /* Ensure the image fits */
+                background-position: center; /* Center the image */
+                background-repeat: no-repeat; /* Prevent duplication */
+                font-family: Arial, sans-serif;
+                color: #fff;
+                text-align: center;
+            }
+            .container {
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 20px;
+                border-radius: 10px;
+                margin-top: 300px;
+                display: inline-block;
+            }
+            input[type="file"], input[type="submit"] {
+                margin: 10px;
+                padding: 10px;
+                font-size: 1em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Upload Maternal Abdominal ECG File</h1>
+            <form method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".csv">
+                <br>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+    </body>
+    </html>
+    '''
+    
 # Route for the Results Page
 @app.route('/results')
 def results_page():
@@ -189,78 +256,6 @@ def results_page():
     </body>
     </html>
     '''
-
-# Route to download the extracted fetal ECG .mat file
-@app.route('/download/fetal_ecg_pred')
-def download_file():
-    if 'result_buffer' in app.config:
-        result_buffer = app.config['result_buffer']
-        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
-    return "No file available for download", 404
-
-# Route for Upload Page
-@app.route('/', methods=['GET', 'POST'])
-def upload_page():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return "No file part in the request"
-        file = request.files['file']
-        if file.filename == '':
-            return "No selected file"
-        if file and allowed_file(file.filename):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.mat')
-            file.save(file_path)
-            
-            # Process the uploaded file (MAT file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path)
-            if result_buffer is not None:
-                app.config['result_buffer'] = result_buffer
-            
-            # Redirect to results page after processing
-            return redirect(url_for('results_page'))
-
-    return '''
-    <!doctype html>
-    <html lang="en">
-    <head>
-        <title>Upload Maternal ECG .mat File</title>
-        <style>
-            body {
-                background-image: url('/static/full_pipeline.png');
-                background-size: contain; /* Ensure the image fits */
-                background-position: center; /* Center the image */
-                background-repeat: no-repeat; /* Prevent duplication */
-                font-family: Arial, sans-serif;
-                color: #fff;
-                text-align: center;
-            }
-            .container {
-                background-color: rgba(0, 0, 0, 0.6);
-                padding: 20px;
-                border-radius: 10px;
-                margin-top: 300px;
-                display: inline-block;
-            }
-            input[type="file"], input[type="submit"] {
-                margin: 10px;
-                padding: 10px;
-                font-size: 1em;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Upload Maternal Abdominal ECG File</h1>
-            <form method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept=".mat">
-                <br>
-                <input type="submit" value="Upload">
-            </form>
-        </div>
-    </body>
-    </html>
-    '''
-
 
 if __name__ == '__main__':
     # Ensure the upload folder exists
