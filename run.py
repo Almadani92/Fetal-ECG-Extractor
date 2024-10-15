@@ -132,10 +132,11 @@ def process_fetal_ecg(file_path):
 
 @app.route('/download/fetal_ecg_pred')
 def download_file():
-    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_ecg_pred.csv')
+    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'combined_ecg_signals.csv')
     if os.path.exists(output_csv_path):
-        return send_file(output_csv_path, as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
+        return send_file(output_csv_path, as_attachment=True, download_name='combined_ecg_signals.csv', mimetype='text/csv')
     else:
+        logging.error('No file available for download.')
         return "No file available for download", 404
 
 # Route for Upload Page
