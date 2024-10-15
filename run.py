@@ -115,11 +115,14 @@ def process_fetal_ecg(file_path):
 
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
         fetal_ecg_pred = fetal_ecg_pred.squeeze()  # Remove any unnecessary dimensions
-        # Save the output to a .csv file
-        output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_ecg_pred.csv')
-        np.savetxt(output_csv_path, fetal_ecg_pred, delimiter=",")
+        # Stack maternal_ecg and fetal_ecg_pred as two columns
+        combined_ecg = np.column_stack((maternal_ecg, fetal_ecg_pred))
 
-        logging.info('Fetal ECG processing complete.')
+        # Save the combined signals to a .csv file
+        output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'combined_ecg_signals.csv')
+        np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Maternal_abdominal_ECG,Fetal_ECG", comments='')
+
+        logging.info('Maternal and fetal ECG processing complete.')
         return output_csv_path
 
     except Exception as e:
