@@ -96,29 +96,30 @@ def process_fetal_ecg(file_path):
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
         
         # Assume the maternal ECG is in the first column
-        maternal_ecg = df.iloc[:, 0].values
-        # kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
-        # maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
-        # fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
+        maternal_ecg_all_sig = df.iloc[:, 0].values
+        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
+        maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
+        fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
 
-        # for i in range(kh):
-            # maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
-            # maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
-            # maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
-            # maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
-            # maternal_ecg = maternal_ecg / np.max(maternal_ecg)
-            # maternal_ecg = maternal_ecg * 2
+        for i in range(kh):
+            maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
+            maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
+            maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
+            maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
+            maternal_ecg = maternal_ecg / np.max(maternal_ecg)
+            maternal_ecg = maternal_ecg * 2
 
-            # maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
-            # maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
+            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
 
-        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-            # if fetal_ecg_pred is None:
-                # logging.error('Error during fetal ECG processing.')
-                # return None
+            # Process using the model
+            fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
+            if fetal_ecg_pred is None:
+                logging.error('Error during fetal ECG processing.')
+                return None
 
-            # fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-            # fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
+            fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+            fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
             
         # Plot maternal and fetal ECG signals and save the figure
         plt.figure(figsize=(10, 6))
@@ -142,23 +143,27 @@ def process_fetal_ecg(file_path):
         plt.savefig('static/fetal_ecg_plot.png')
         plt.close('all')  # Close all figures
 
-        # Save the output to a CSV file on disk
+
         # combined_data = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
-        
-        output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
+        # output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
        # np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
-        np.savetxt(output_filename, fetal_ecg_pred, comments="")
+        # logging.info(f"CSV file saved to {output_filename}")  # Log file path
+        # if not os.path.exists(output_filename):
+            # logging.error(f"File does not exist: {output_filename}")
+        # else:
+            # logging.info(f"File exists and ready for download.")
+        # app.config['result_filename'] = output_filename
         
-        logging.info(f"CSV file saved to {output_filename}")  # Log file path
-        if not os.path.exists(output_filename):
-            logging.error(f"File does not exist: {output_filename}")
-        else:
-            logging.info(f"File exists and ready for download.")
+        # return output_filename
         
-        # Save filename to app config for download access
-        app.config['result_filename'] = output_filename
+        # Save the result as a MAT file in a bytes buffer (in-memory)
+        result_buffer = io.BytesIO()
+        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
+        result_buffer.seek(0)
         
-        return output_filename
+        return result_buffer
+    
+    
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
