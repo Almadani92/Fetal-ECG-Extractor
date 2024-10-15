@@ -12,6 +12,7 @@ import requests
 import urllib.request
 from scipy.signal import butter, filtfilt, iirnotch
 import csv
+import matplotlib.pyplot as plt
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -93,9 +94,6 @@ def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     try:
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
-        
-        # Assume the maternal ECG is in the first column
-        
         maternal_ecg_all_sig = df.iloc[:, 0].values
         kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
@@ -120,14 +118,27 @@ def process_fetal_ecg(file_path):
 
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
-        
 
         # Stack maternal_ecg and fetal_ecg_pred as two columns
         combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
-        # print('combined_ecg shape is -------------------->>>>>>>>>>>',combined_ecg.shape)
+
         # Save the combined signals to a .csv file
         output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
         np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
+
+        # Plot and save the last loop of maternal ECG and fetal ECG prediction
+        plt.figure(figsize=(10, 6))
+        plt.plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
+        plt.plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
+        plt.xlabel('Samples')
+        plt.ylabel('Amplitude')
+        plt.title('Maternal ECG vs Fetal ECG Prediction')
+        plt.legend()
+
+        # Save the plot in the static folder to display it in the results page
+        plot_path = os.path.join('static', 'fetal_ecg_plot.png')
+        plt.savefig(plot_path)
+        plt.close()
 
         logging.info('Maternal and fetal ECG processing complete.')
         return output_csv_path
@@ -135,6 +146,7 @@ def process_fetal_ecg(file_path):
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
+
 
 
 
@@ -210,7 +222,6 @@ def upload_page():
     </html>
     '''
     
-# Route for the Results Page
 @app.route('/results')
 def results_page():
     return '''
@@ -263,12 +274,13 @@ def results_page():
             <h1>Fetal ECG Extraction Results</h1>
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
             <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.csv">Download Fetal ECG as .csv File</a>
+            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_and_maternal_ecg_signals.csv">Download Fetal ECG as .csv File</a>
             <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
         </div>
     </body>
     </html>
     '''
+
 
 if __name__ == '__main__':
     # Ensure the upload folder exists
