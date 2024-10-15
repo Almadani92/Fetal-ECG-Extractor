@@ -8,12 +8,13 @@ from networks_real import build_UNETR
 import requests
 import urllib.request
 from scipy.signal import butter, filtfilt, iirnotch
+from scipy.io import savemat  # Import savemat to save the file as .mat
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'results'  # Folder to save the CSV files
+RESULTS_FOLDER = 'results'  # Folder to save the .mat files
 ALLOWED_EXTENSIONS = {'csv'}
 
 app = Flask(__name__)
@@ -88,7 +89,7 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-# Function to process the uploaded CSV file and save to disk
+# Function to process the uploaded CSV file and save to .mat file
 def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     try:
@@ -120,56 +121,27 @@ def process_fetal_ecg(file_path):
 
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
-            
-        # Plot maternal and fetal ECG signals and save the figure
-        plt.figure(figsize=(10, 6))
-    
-        # Plot maternal ECG
-        plt.subplot(2, 1, 1)
-        plt.plot(maternal_ecg.flatten(), color='blue')
-        plt.title('Maternal Abdominal ECG Signal')
-        plt.xlabel('Sample Index')
-        plt.ylabel('Amplitude')
-    
-        # Plot fetal ECG prediction
-        plt.subplot(2, 1, 2)
-        plt.plot(fetal_ecg_pred.flatten(), color='green')
-        plt.title('Fetal ECG Prediction')
-        plt.xlabel('Sample Index')
-        plt.ylabel('Amplitude')
-    
-        # Adjust layout and save the figure
-        plt.tight_layout()
-        plt.savefig('static/fetal_ecg_plot.png')
-        plt.close('all')  # Close all figures
 
-
-        # combined_data = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
-        # output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.csv')
-       # np.savetxt(output_filename, combined_data, delimiter=",", header="Maternal Abdominal ECG,Extracted Fetal ECG", comments="")
-        # logging.info(f"CSV file saved to {output_filename}")  # Log file path
-        # if not os.path.exists(output_filename):
-            # logging.error(f"File does not exist: {output_filename}")
-        # else:
-            # logging.info(f"File exists and ready for download.")
-        # app.config['result_filename'] = output_filename
+        # Save the output to a .mat file
+        output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.mat')
+        savemat(output_filename, {'maternal_ecg': maternal_ecg_all_sig, 'fetal_ecg': fecg_pred_all_sig})  # Save both signals to the .mat file
         
-        # return output_filename
+        logging.info(f".mat file saved to {output_filename}")  # Log file path
+        if not os.path.exists(output_filename):
+            logging.error(f"File does not exist: {output_filename}")
+        else:
+            logging.info(f"File exists and ready for download.")
         
-        # Save the result as a MAT file in a bytes buffer (in-memory)
-        result_buffer = io.BytesIO()
-        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
-        result_buffer.seek(0)
+        # Save filename to app config to access in download route
+        app.config['result_filename'] = output_filename
         
-        return result_buffer
-    
-    
+        return output_filename
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
 
-# Route to download the extracted fetal ECG .csv file
+# Route to download the extracted fetal ECG .mat file
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     try:
@@ -182,7 +154,6 @@ def download_file():
     except Exception as e:
         logging.error(f"Error serving the file: {e}")
         return "No file available for download", 404
-
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
@@ -303,7 +274,7 @@ def results_page():
             <h1>Fetal ECG Extraction Results</h1>
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
             <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_ecg_pred.csv">Download Fetal ECG as .csv File</a>
+            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_and_maternal_ecg.mat">Download Fetal ECG as .mat File</a>
             <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
         </div>
     </body>
