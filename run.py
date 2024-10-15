@@ -115,11 +115,12 @@ def process_fetal_ecg(file_path):
 
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
         fetal_ecg_pred = fetal_ecg_pred.squeeze()  # Remove any unnecessary dimensions
+        maternal_ecg = maternal_ecg.squeeze()
         # Stack maternal_ecg and fetal_ecg_pred as two columns
         combined_ecg = np.column_stack((maternal_ecg, fetal_ecg_pred))
 
         # Save the combined signals to a .csv file
-        output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'combined_ecg_signals.csv')
+        output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
         np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Maternal_abdominal_ECG,Fetal_ECG", comments='')
 
         logging.info('Maternal and fetal ECG processing complete.')
@@ -132,9 +133,9 @@ def process_fetal_ecg(file_path):
 
 @app.route('/download/fetal_ecg_pred')
 def download_file():
-    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'combined_ecg_signals.csv')
+    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
     if os.path.exists(output_csv_path):
-        return send_file(output_csv_path, as_attachment=True, download_name='combined_ecg_signals.csv', mimetype='text/csv')
+        return send_file(output_csv_path, as_attachment=True, download_name='fetal_and_maternal_ecg_signals.csv', mimetype='text/csv')
     else:
         logging.error('No file available for download.')
         return "No file available for download", 404
