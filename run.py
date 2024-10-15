@@ -102,7 +102,7 @@ def process_fetal_ecg(file_path):
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
 
         for i in range(kh):
-            maternal_ecg = maternal_ecg_all_sig[992*(i-1):992*i]    
+            maternal_ecg = maternal_ecg_all_sig[992*i:992*(i+1)] 
             maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
             maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
             maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
@@ -119,19 +119,19 @@ def process_fetal_ecg(file_path):
                 return None
 
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-            fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred.squeeze() 
+            fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
         
 
         # Stack maternal_ecg and fetal_ecg_pred as two columns
         combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
-
+        # print('combined_ecg shape is -------------------->>>>>>>>>>>',combined_ecg.shape)
         # Save the combined signals to a .csv file
         output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
         np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
         logging.info('Maternal and fetal ECG processing complete.')
         return output_csv_path
-
+        
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
