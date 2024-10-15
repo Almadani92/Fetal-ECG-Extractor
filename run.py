@@ -136,9 +136,6 @@ def process_fetal_ecg(file_path):
         logging.error(f"Error processing the file: {e}")
         return None
 
-    except Exception as e:
-        logging.error(f"Error processing the file: {e}")
-        return None
 
 
 @app.route('/download/fetal_ecg_pred')
