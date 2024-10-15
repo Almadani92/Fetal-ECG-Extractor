@@ -4,27 +4,25 @@ import torch
 import numpy as np
 import pandas as pd
 from flask import Flask, request, redirect, url_for, send_file
+from io import BytesIO
+from scipy.io import savemat
 from networks_real import build_UNETR
 import requests
 import urllib.request
 from scipy.signal import butter, filtfilt, iirnotch
-from scipy.io import savemat  # Import savemat to save the file as .mat
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'results'  # Folder to save the .mat files
 ALLOWED_EXTENSIONS = {'csv'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
-app.config['result_filename'] = None
+app.config['result_buffer'] = None  # In-memory result buffer
 
-# Ensure upload and results directories exist
+# Ensure the upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 # Bandpass filter function
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -49,16 +47,6 @@ def notch_filter_ecg(ecg_signal, sampling_freq=250, notch_freq=50, Q=30):
 # Check if uploaded file has allowed extension
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def download_model(url, destination):
-    logging.info("Downloading the model from Dropbox...")
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
-        with open(destination, 'wb') as f:
-            f.write(response.content)
-        logging.info("Model downloaded successfully!")
-    else:
-        logging.error(f"Error downloading the model: {response.status_code}")
 
 # Function to process fetal ECG
 def process_fecg(inputs):
@@ -89,7 +77,7 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-# Function to process the uploaded CSV file and save to .mat file
+# Function to process the uploaded CSV file and save to an in-memory .mat file
 def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     try:
@@ -122,32 +110,29 @@ def process_fetal_ecg(file_path):
             fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
             fecg_pred_all_sig[992*(i-1):992*i] = fetal_ecg_pred[0,0,:]
 
-        # Save the output to a .mat file
-        output_filename = os.path.join(app.config['RESULTS_FOLDER'], 'fetal_and_maternal_ecg.mat')
-        savemat(output_filename, {'maternal_ecg': maternal_ecg_all_sig, 'fetal_ecg': fecg_pred_all_sig})  # Save both signals to the .mat file
+        # Save the output to an in-memory .mat file
+        result_buffer = BytesIO()  # Use BytesIO for in-memory file storage
+        savemat(result_buffer, {'maternal_ecg': maternal_ecg_all_sig, 'fetal_ecg': fecg_pred_all_sig})  # Save both signals to the .mat file
+        result_buffer.seek(0)  # Set the pointer to the beginning of the buffer
         
-        logging.info(f".mat file saved to {output_filename}")  # Log file path
-        if not os.path.exists(output_filename):
-            logging.error(f"File does not exist: {output_filename}")
-        else:
-            logging.info(f"File exists and ready for download.")
-        
-        # Save filename to app config to access in download route
-        app.config['result_filename'] = output_filename
-        
-        return output_filename
+        logging.info(f".mat file created in memory")  # Log the creation of the file
+
+        # Save result buffer to app config for later download
+        app.config['result_buffer'] = result_buffer
+
+        return result_buffer
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
 
-# Route to download the extracted fetal ECG .mat file
+# Route to download the extracted fetal ECG .mat file from memory
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     try:
-        if app.config['result_filename']:
-            logging.info(f"Serving file: {app.config['result_filename']}")
-            return send_file(app.config['result_filename'], as_attachment=True)
+        if app.config['result_buffer'] is not None:
+            logging.info(f"Serving file from memory")
+            return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_and_maternal_ecg.mat', mimetype='application/x-matlab-data')
         else:
             logging.error("No file available for download.")
             return "No file available for download", 404
@@ -172,9 +157,9 @@ def upload_page():
             logging.info("File uploaded and saved.")
 
             # Process the uploaded file (CSV file processing and ECG extraction)
-            output_filename = process_fetal_ecg(file_path)
-            if output_filename is not None:
-                logging.info(f"File processed and saved as {output_filename}")
+            result_buffer = process_fetal_ecg(file_path)
+            if result_buffer is not None:
+                logging.info("File processed and saved in memory.")
             
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
@@ -282,11 +267,9 @@ def results_page():
     '''
 
 if __name__ == '__main__':
-    # Ensure the upload and results folders exist
+    # Ensure the upload folder exists
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
-    if not os.path.exists(RESULTS_FOLDER):
-        os.makedirs(RESULTS_FOLDER)
 
     # Run the Flask server using the dynamic port provided by Render or Railway
     port = int(os.environ.get('PORT', 5000))
