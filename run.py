@@ -88,11 +88,11 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-# Function to process the uploaded CSV file
+import csv
+
 def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     try:
-        # Load CSV as a dataframe
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
         
         # Assume the maternal ECG is in the first column
@@ -115,25 +115,25 @@ def process_fetal_ecg(file_path):
             return None
 
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-        # Save the output to a .mat file in memory
-        result_buffer = BytesIO()
-        savemat(result_buffer, {'fetal_ecg_pred': fetal_ecg_pred})
-        result_buffer.seek(0)
+
+        # Save the output to a .csv file in memory
+        output_csv = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_ecg_pred.csv')
+        np.savetxt(output_csv, fetal_ecg_pred, delimiter=",")
 
         logging.info('Fetal ECG processing complete.')
-        return result_buffer
+        return output_csv
 
     except Exception as e:
         logging.error(f"Error processing the file: {e}")
         return None
 
-# Route to download the extracted fetal ECG .mat file
+
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     if 'result_buffer' in app.config and app.config['result_buffer'] is not None:
-        result_buffer = app.config['result_buffer']
-        return send_file(result_buffer, as_attachment=True, download_name='fetal_ecg_pred.mat', mimetype='application/x-matlab-data')
+        return send_file(app.config['result_buffer'], as_attachment=True, download_name='fetal_ecg_pred.csv', mimetype='text/csv')
     return "No file available for download", 404
+
 
 # Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
