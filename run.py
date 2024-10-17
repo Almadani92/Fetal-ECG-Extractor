@@ -90,11 +90,12 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-def process_fetal_ecg(file_path):
+def process_fetal_ecg(file_path, signal_length):
     logging.info('Loading maternal ECG from .csv file...')
     try:
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
         maternal_ecg_all_sig = df.iloc[:, 0].values
+        sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
         kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
@@ -166,13 +167,15 @@ def download_file():
         logging.error('No file available for download.')
         return "No file available for download", 404
 
-# Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
-        if 'file' not in request.files:
-            return "No file part in the request"
+        if 'file' not in request.files or 'signal_length' not in request.form:
+            return "No file part or length in the request"
+        
         file = request.files['file']
+        signal_length = request.form['signal_length']
+        
         if file.filename == '':
             return "No selected file"
         if file and allowed_file(file.filename):
@@ -180,7 +183,7 @@ def upload_page():
             file.save(file_path)
             
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path)
+            result_buffer = process_fetal_ecg(file_path, int(signal_length))
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
             
@@ -209,7 +212,7 @@ def upload_page():
                 margin-top: 300px;
                 display: inline-block;
             }
-            input[type="file"], input[type="submit"] {
+            input[type="file"], input[type="number"], input[type="submit"] {
                 margin: 10px;
                 padding: 10px;
                 font-size: 1em;
@@ -222,12 +225,16 @@ def upload_page():
             <form method="post" enctype="multipart/form-data">
                 <input type="file" name="file" accept=".csv">
                 <br>
+                <label for="signal_length">Desired Signal Length in Seconds:</label>
+                <input type="number" name="signal_length" min="1" required>
+                <br>
                 <input type="submit" value="Upload">
             </form>
         </div>
     </body>
     </html>
     '''
+
     
 @app.route('/results')
 def results_page():
