@@ -13,7 +13,6 @@ import urllib.request
 from scipy.signal import butter, filtfilt, iirnotch
 import csv
 import matplotlib.pyplot as plt
-from scipy.signal import decimate
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -97,8 +96,6 @@ def process_fetal_ecg(file_path, signal_length):
         df = pd.read_csv(file_path, header=None)  # No header in the CSV file
         maternal_ecg_all_sig = df.iloc[:, 0].values
         sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
-        downsampling_factor = sampling_freq/250
-        maternal_ecg_all_sig = decimate(maternal_ecg_all_sig ,downsampling_factor)
         kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
@@ -188,7 +185,7 @@ def upload_page():
             file.save(file_path)
 
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path, signal_length)  # Pass signal length to the processing function
+            result_buffer = process_fetal_ecg(file_path, int(signal_length))  # Pass signal length to the processing function
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
 
