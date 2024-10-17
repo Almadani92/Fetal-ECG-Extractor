@@ -92,70 +92,63 @@ def process_fecg(inputs):
 
 def process_fetal_ecg(file_path, signal_length):
     logging.info('Loading maternal ECG from .csv file...')
-    try:
-        df = pd.read_csv(file_path, header=None)  # No header in the CSV file
-        maternal_ecg_all_sig = df.iloc[:, 0].values
-        sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
-        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
-        maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
-        fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
+    df = pd.read_csv(file_path, header=None)  # No header in the CSV file
+    maternal_ecg_all_sig = df.iloc[:, 0].values
+    sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
+    kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
+    maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
+    fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
 
-        for i in range(kh):
-            maternal_ecg = maternal_ecg_all_sig[992*i:992*(i+1)] 
-            maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
-            maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
-            maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
-            maternal_ecg = maternal_ecg / np.max(maternal_ecg)
-            maternal_ecg = maternal_ecg * 2
+    for i in range(kh):
+        maternal_ecg = maternal_ecg_all_sig[992*i:992*(i+1)] 
+        maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
+        maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
+        maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
+        maternal_ecg = maternal_ecg / np.max(maternal_ecg)
+        maternal_ecg = maternal_ecg * 2
 
-            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
-            maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
+        maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
 
-            # Process using the model
-            fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-            if fetal_ecg_pred is None:
-                logging.error('Error during fetal ECG processing.')
-                return None
+        # Process using the model
+        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
+        if fetal_ecg_pred is None:
+            logging.error('Error during fetal ECG processing.')
+            return None
 
-            fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-            fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
+        fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
+        fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
 
-        # Stack maternal_ecg and fetal_ecg_pred as two columns
-        combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
+    # Stack maternal_ecg and fetal_ecg_pred as two columns
+    combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
 
-        # Save the combined signals to a .csv file
-        output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
-        np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
+    # Save the combined signals to a .csv file
+    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
+    np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
-        # Plot subplots for maternal and fetal ECG
-        fig, ax = plt.subplots(2, 1, figsize=(10, 8))
-        ax[0].plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
-        ax[0].set_title("Maternal ECG")
-        ax[0].set_xlabel("Samples")
-        ax[0].set_ylabel("Amplitude")
-        ax[0].legend()
+    # Plot subplots for maternal and fetal ECG
+    fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+    ax[0].plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
+    ax[0].set_title("Maternal ECG")
+    ax[0].set_xlabel("Samples")
+    ax[0].set_ylabel("Amplitude")
+    ax[0].legend()
 
-        ax[1].plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
-        ax[1].set_title("Fetal ECG Prediction")
-        ax[1].set_xlabel("Samples")
-        ax[1].set_ylabel("Amplitude")
-        ax[1].legend()
+    ax[1].plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
+    ax[1].set_title("Fetal ECG Prediction")
+    ax[1].set_xlabel("Samples")
+    ax[1].set_ylabel("Amplitude")
+    ax[1].legend()
 
-        # Adjust layout and save the plot in the static folder
-        plt.tight_layout()
-        plot_path = os.path.join('static', 'fetal_ecg_plot.png')
-        plt.savefig(plot_path)
-        plt.close()
+    # Adjust layout and save the plot in the static folder
+    plt.tight_layout()
+    plot_path = os.path.join('static', 'fetal_ecg_plot.png')
+    plt.savefig(plot_path)
+    plt.close()
 
-        logging.info('Maternal and fetal ECG processing complete.')
-        return output_csv_path
+    logging.info('Maternal and fetal ECG processing complete.')
+    return output_csv_path
         
-    except Exception as e:
-        logging.error(f"Error processing the file: {e}")
-        return None
-
-
-
 
 
 @app.route('/download/fetal_ecg_pred')
