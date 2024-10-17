@@ -91,10 +91,6 @@ def process_fetal_ecg(file_path, signal_length):
 
     df = pd.read_csv(file_path, header=None)  # No header in the CSV file
     maternal_ecg_all_sig = df.iloc[:, 0].values
-    
-    # Limit the signal length to the user-specified value
-    maternal_ecg_all_sig = maternal_ecg_all_sig[:signal_length]
-
     kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
     maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
     fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
