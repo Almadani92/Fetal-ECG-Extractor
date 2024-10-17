@@ -227,7 +227,7 @@ def upload_page():
             <form method="post" enctype="multipart/form-data">
                 <input type="file" name="file" accept=".csv" required>
                 <br>
-                <label for="signal_length">Desired Signal Length:</label>
+                <label for="signal_length">Uploaded Signal Length in Seconds:</label>
                 <input type="number" name="signal_length" min="1" required>
                 <br>
                 <input type="submit" value="Upload">
