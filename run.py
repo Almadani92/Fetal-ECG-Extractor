@@ -98,8 +98,8 @@ def process_fetal_ecg(file_path, signal_length):
         maternal_ecg_all_sig = df.iloc[:, 0].values
         sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
         downsampling_factor = sampling_freq/250
-        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = decimate(maternal_ecg_all_sig ,downsampling_factor)
+        kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
         maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
         fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
 
