@@ -90,11 +90,10 @@ def process_fecg(inputs):
 
     return fecg_pred
 
-def process_fetal_ecg(file_path, signal_length):
+def process_fetal_ecg(file_path):
     logging.info('Loading maternal ECG from .csv file...')
     df = pd.read_csv(file_path, header=None)  # No header in the CSV file
     maternal_ecg_all_sig = df.iloc[:, 0].values
-    sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
     kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
     maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
     fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
@@ -151,6 +150,10 @@ def process_fetal_ecg(file_path, signal_length):
         
 
 
+
+
+
+
 @app.route('/download/fetal_ecg_pred')
 def download_file():
     output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
@@ -160,28 +163,24 @@ def download_file():
         logging.error('No file available for download.')
         return "No file available for download", 404
 
+# Route for Upload Page
 @app.route('/', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
         if 'file' not in request.files:
             return "No file part in the request"
-        if 'signal_length' not in request.form or not request.form['signal_length']:
-            return "No signal length provided"
-
         file = request.files['file']
-        signal_length = request.form['signal_length']  # Get the signal length
-
         if file.filename == '':
             return "No selected file"
         if file and allowed_file(file.filename):
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.csv')
             file.save(file_path)
-
+            
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path, int(signal_length))  # Pass signal length to the processing function
+            result_buffer = process_fetal_ecg(file_path)
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
-
+            
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
 
@@ -207,7 +206,7 @@ def upload_page():
                 margin-top: 300px;
                 display: inline-block;
             }
-            input[type="file"], input[type="number"], input[type="submit"] {
+            input[type="file"], input[type="submit"] {
                 margin: 10px;
                 padding: 10px;
                 font-size: 1em;
@@ -218,10 +217,7 @@ def upload_page():
         <div class="container">
             <h1>Upload Maternal Abdominal ECG File</h1>
             <form method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept=".csv" required>
-                <br>
-                <label for="signal_length">Uploaded Signal Length in Seconds:</label>
-                <input type="number" name="signal_length" min="1" required>
+                <input type="file" name="file" accept=".csv">
                 <br>
                 <input type="submit" value="Upload">
             </form>
@@ -229,7 +225,6 @@ def upload_page():
     </body>
     </html>
     '''
-
     
 @app.route('/results')
 def results_page():
