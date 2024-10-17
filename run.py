@@ -81,12 +81,8 @@ def process_fecg(inputs):
     inputs = Variable(inputs).float().to(device)
 
     logging.info('Running inference...')
-    try:
-        mecg_pred, fecg_pred = net(inputs)
-        logging.info('Inference completed successfully.')
-    except Exception as e:
-        logging.error(f'Error during inference: {e}')
-        return None
+    mecg_pred, fecg_pred = net(inputs)
+    logging.info('Inference completed successfully.')
 
     return fecg_pred
 
