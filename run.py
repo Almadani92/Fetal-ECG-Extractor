@@ -78,6 +78,7 @@ def process_fecg(inputs):
     
     inputs = np.einsum('ijk->jki', inputs)
     inputs = torch.from_numpy(inputs)
+    print("the input shape is ------------------->>>>>>>>>>>>",inputs.shape)
     inputs = Variable(inputs).float().to(device)
 
     logging.info('Running inference...')
@@ -91,6 +92,7 @@ def process_fetal_ecg(file_path, signal_length):
 
     df = pd.read_csv(file_path, header=None)  # No header in the CSV file
     maternal_ecg_all_sig = df.iloc[:, 0].values
+
     kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
     maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
     fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
@@ -105,13 +107,9 @@ def process_fetal_ecg(file_path, signal_length):
 
         maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
         maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
-
+        print("maternal_ecgshape is --------------->>>>>>>>>",maternal_ecg.shape)
         # Process using the model
         fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-        if fetal_ecg_pred is None:
-            logging.error('Error during fetal ECG processing.')
-            return None
-
         fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
         fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
 
