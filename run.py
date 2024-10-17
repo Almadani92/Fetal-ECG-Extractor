@@ -170,23 +170,25 @@ def download_file():
 @app.route('/', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
-        if 'file' not in request.files or 'signal_length' not in request.form:
-            return "No file part or length in the request"
-        
+        if 'file' not in request.files:
+            return "No file part in the request"
+        if 'signal_length' not in request.form or not request.form['signal_length']:
+            return "No signal length provided"
+
         file = request.files['file']
-        signal_length = request.form['signal_length']
-        
+        signal_length = request.form['signal_length']  # Get the signal length
+
         if file.filename == '':
             return "No selected file"
         if file and allowed_file(file.filename):
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maecg_signal.csv')
             file.save(file_path)
-            
+
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path, int(signal_length))
+            result_buffer = process_fetal_ecg(file_path, int(signal_length))  # Pass signal length to the processing function
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
-            
+
             # Redirect to results page after processing
             return redirect(url_for('results_page'))
 
@@ -223,9 +225,9 @@ def upload_page():
         <div class="container">
             <h1>Upload Maternal Abdominal ECG File</h1>
             <form method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept=".csv">
+                <input type="file" name="file" accept=".csv" required>
                 <br>
-                <label for="signal_length">Desired Signal Length in Seconds:</label>
+                <label for="signal_length">Desired Signal Length:</label>
                 <input type="number" name="signal_length" min="1" required>
                 <br>
                 <input type="submit" value="Upload">
