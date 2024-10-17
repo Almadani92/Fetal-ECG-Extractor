@@ -188,7 +188,7 @@ def upload_page():
             file.save(file_path)
 
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path, int(signal_length))  # Pass signal length to the processing function
+            result_buffer = process_fetal_ecg(file_path, signal_length)  # Pass signal length to the processing function
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
 
