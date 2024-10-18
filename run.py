@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat, savemat
 from torch.autograd import Variable
-from flask import Flask, request, redirect, url_for, send_file
+from flask import Flask, request, redirect, url_for, send_file, render_template_string
 from io import BytesIO
 from networks_real import build_UNETR
 import requests
@@ -13,6 +13,7 @@ import urllib.request
 from scipy.signal import butter, filtfilt, iirnotch
 import csv
 import matplotlib.pyplot as plt
+from scipy.signal import decimate
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +95,10 @@ def process_fetal_ecg(file_path, signal_length):
     df = pd.read_csv(file_path, header=None)  # No header in the CSV file
     maternal_ecg_all_sig = df.iloc[:, 0].values
     sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
+    downsampling_factor = np.int32(sampling_freq/250)
+    print("downsampling_factor is -------------------->",downsampling_factor)
+    if downsampling_factor >1:
+        maternal_ecg_all_sig = decimate(maternal_ecg_all_sig, downsampling_factor)
     kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
     maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
     fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
@@ -158,8 +163,83 @@ def download_file():
         logging.error('No file available for download.')
         return "No file available for download", 404
 
+        
+@app.route('/welcome')
+def welcome_page():
+    return render_template_string('''
+    <!doctype html>
+    <html lang="en">
+    <head>
+        <title>Welcome to the Fetal ECG Extraction Program</title>
+        <style>
+            body {
+                background-color: #f4f4f9;
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                text-align: center;
+            }
+            .container {
+                margin: 50px auto;
+                padding: 20px;
+                width: 80%;
+                background-color: #ffffff;
+                box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+                border-radius: 10px;
+            }
+            h1 {
+                color: #333;
+            }
+            p {
+                font-size: 1.1em;
+                color: #666;
+            }
+            a {
+                color: #007bff;
+                text-decoration: none;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+            .download-link {
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Welcome to the Fetal ECG Extraction Program</h1>
+            <p>When using this resource, please cite the original publication:</p>
+            <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," 
+            <br>in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645.</p>
+            
+            <p>This program allows you to generate the fetal ECG signal from your own maternal abdominal single-lead data.</p>
+            <p>The program accepts data in <strong>.csv</strong> format. You can download an example file 
+            <a href="https://www.dropbox.com/scl/fi/2fbch6cgffw6ha22d8jqw/maecg.csv?rlkey=d66575fgwuuq3ety23gphhtb1&st=b1bay904&dl=1" class="download-link" download>here</a>.</p>
+            
+            <p>The minimum data length to be processed is 4 seconds.</p>
+            
+            <p>We ensure that your uploaded data will not be stored or saved on our servers. The data is processed solely for generating fetal ECG, and once processing is complete, the data is discarded.</p>
+            
+            <p>This program is designed for research and academic purposes only. It is not intended for commercial or clinical use.</p>
+            
+            <p>Please note that this tool is created to assist researchers and students, and as such, we cannot guarantee that the generated fetal ECG signal will be 100% accurate.</p>
+            
+            <p><a href="/upload">Go to Upload Page</a></p>
+        </div>
+    </body>
+    </html>
+    ''')
+
+    
+# Redirect the root route to /welcome
+@app.route('/')
+def home_page():
+    return redirect(url_for('welcome_page'))
+    
+
 # Route for Upload Page
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -177,7 +257,7 @@ def upload_page():
             file.save(file_path)
 
             # Process the uploaded file (CSV file processing and ECG extraction)
-            result_buffer = process_fetal_ecg(file_path, int(signal_length))  # Pass signal length to the processing function
+            result_buffer = process_fetal_ecg(file_path, float(signal_length))  # Pass signal length to the processing function
             if result_buffer is not None:
                 app.config['result_buffer'] = result_buffer
 
@@ -220,7 +300,7 @@ def upload_page():
                 <input type="file" name="file" accept=".csv" required>
                 <br>
                 <label for="signal_length">Uploaded Signal Length in Seconds:</label>
-                <input type="number" name="signal_length" min="1" required>
+                <input type="number" name="signal_length" min="0.1" step="0.001" required>
                 <br>
                 <input type="submit" value="Upload">
             </form>
@@ -228,6 +308,7 @@ def upload_page():
     </body>
     </html>
     '''
+    
     
 @app.route('/results')
 def results_page():
