@@ -177,17 +177,17 @@ def welcome_page():
                 font-family: Arial, sans-serif;
                 margin: 0;
                 padding: 0;
-                text-align: center;
+                text-align: left;  /* Align text to the left */
             }
             .container {
-                margin: 50px auto;
+                margin-left: 30px;  /* Add left margin */
                 padding: 20px;
-                width: 80%;
+                width: 90%;  /* Make the container wider */
                 background-color: #ffffff;
                 box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
                 border-radius: 10px;
             }
-            h1 {
+            h1, h2 {
                 color: #333;
             }
             p {
@@ -204,32 +204,128 @@ def welcome_page():
             .download-link {
                 font-weight: bold;
             }
+            /* Style for the citation box */
+            .citation-box {
+                background-color: #f0f0f0;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px solid #ccc;
+                margin-bottom: 20px;
+                color: #333;
+            }
+            /* Style for the author section */
+            .authors {
+                margin-top: 50px;
+            }
+            .authors h2 {
+                margin-bottom: 20px;
+            }
+            .author {
+                display: flex;  /* Use flex to align items horizontally */
+                align-items: flex-start;  /* Align text with the top of the image */
+                margin-bottom: 40px;  /* Add spacing between authors */
+            }
+            .author img {
+                width: 150px;
+                height: 150px;
+                border-radius: 50%;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                margin-right: 20px;  /* Space between the image and the text */
+            }
+            .author-info {
+                max-width: 600px;  /* Limit the width of the text */
+            }
+            .author-info p {
+                margin: 5px 0;  /* Reduce spacing between paragraphs */
+                color: #333;
+                font-weight: bold;
+            }
+            .author-info .bio {
+                font-weight: normal;
+                color: #666;
+                font-size: 0.95em;
+            }
+            /* Style for the "Go to Upload Page" button */
+            .upload-link {
+                display: block;  /* Make it a block element */
+                text-align: center;  /* Center the text */
+                background-color: #28a745;  /* Green background */
+                color: white;  /* White text */
+                padding: 15px 20px;  /* Padding for the box */
+                border-radius: 5px;  /* Rounded corners */
+                margin: 40px auto;  /* Center it with top/bottom margin */
+                width: 200px;  /* Fixed width */
+                text-decoration: none;  /* No underline */
+                font-weight: bold;  /* Bold text */
+            }
+            .upload-link:hover {
+                background-color: #218838;  /* Darker green on hover */
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Welcome to the Fetal ECG Extraction Program</h1>
-            <p>When using this resource, please cite the original publication:</p>
-            <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," 
-            <br>in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645.</p>
+            <div class="citation-box">
+                <p>If you use this tool in your research, please cite the following publication:</p>
+                <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," 
+                <br>in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645.</p>
+            </div>
             
-            <p>This program allows you to generate the fetal ECG signal from your own maternal abdominal single-lead data.</p>
+            <p>This program allows you to generate fetal ECG signals from single-lead maternal abdominal ECG data. It is designed for researchers and students working in biomedical engineering and related fields.</p>
+
             <p>The program accepts data in <strong>.csv</strong> format. You can download an example file 
             <a href="https://www.dropbox.com/scl/fi/2fbch6cgffw6ha22d8jqw/maecg.csv?rlkey=d66575fgwuuq3ety23gphhtb1&st=b1bay904&dl=1" class="download-link" download>here</a>.</p>
             
-            <p>The minimum data length to be processed is 4 seconds.</p>
+            <p>Please note that the minimum required data length for processing is 4 seconds. Any input shorter than this will not be processed.</p>
+
+            <p>We take your privacy seriously. Your uploaded data is not stored or saved on our servers. It is processed solely for generating the fetal ECG signal, and all data is automatically deleted after the processing is complete.</p>
             
-            <p>We ensure that your uploaded data will not be stored or saved on our servers. The data is processed solely for generating fetal ECG, and once processing is complete, the data is discarded.</p>
+            <p>This tool is intended for research and educational purposes only. It is not designed or approved for clinical or commercial use.</p>
             
-            <p>This program is designed for research and academic purposes only. It is not intended for commercial or clinical use.</p>
-            
-            <p>Please note that this tool is created to assist researchers and students, and as such, we cannot guarantee that the generated fetal ECG signal will be 100% accurate.</p>
-            
-            <p><a href="/upload">Go to Upload Page</a></p>
+            <p>While we strive to make this tool as accurate as possible, please be aware that the generated fetal ECG signal may not be 100% accurate. Use it as a helpful resource, but always validate results against your own data and research.</p>
+
+            <!-- Author section with biographies -->
+            <div class="authors">
+                <h2>Meet the authors of this project:</h2>
+                
+                <!-- Murad Almadani -->
+                <div class="author">
+                    <img src="/static/Murad.png" alt="Murad Almadani">
+                    <div class="author-info">
+                        <p>Murad Almadani (Coressponding Author)</p>
+                        <p class="bio">Murad Almadani is a Ph.D. researcher in the Biomedical Engineering department at Khalifa University, UAE. His research focuses on signal and image processing, computer vision, and artificial intelligence.</p>
+                    </div>
+                </div>
+
+                <!-- Leontios J. Hadjileontiadis -->
+                <div class="author">
+                    <img src="/static/Leontios.jpg" alt="Leontios J. Hadjileontiadis">
+                    <div class="author-info">
+                        <p>Leontios J. Hadjileontiadis</p>
+                        <p class="bio">Leontios J. Hadjileontiadis is a Professor and Chair of the Biomedical Engineering department at Khalifa University, UAE, as well as a Professor at ECE-Aristotle University of Thessaloniki. His research spans advanced signal processing, machine learning, intelligent biomedical systems, and biomusic composition.</p>
+                    </div>
+                </div>
+
+                <!-- Ahsan Khandoker -->
+                <div class="author">
+                    <img src="/static/Ahsan.png" alt="Ahsan Khandoker">
+                    <div class="author-info">
+                        <p>Ahsan Khandoker</p>
+                        <p class="bio">Ahsan Khandoker is a Professor and theme leader of the Healthcare Engineering Innovation Center (HEIC) at Khalifa University. His multidisciplinary research covers bio-signal processing, bioinstrumentation, nonlinear modeling, and artificial intelligence applied to sleep apnea, cardiovascular diseases, fetal cardiology, and psychiatry.</p>
+                    </div>
+                </div>
+            </div>
+
+            <p>If you require any assistance or have questions, please feel free to contact the corresponding author at <a href="mailto:murad.almadani@gmail.com">murad.almadani@gmail.com</a>.</p>
+
+            <a href="/upload" class="upload-link">Go to Upload Page</a>  <!-- Updated link to be centered in a green box -->
         </div>
     </body>
     </html>
     ''')
+
+
 
     
 # Redirect the root route to /welcome
@@ -308,6 +404,7 @@ def upload_page():
     </body>
     </html>
     '''
+
     
     
 @app.route('/results')
