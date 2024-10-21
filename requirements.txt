@@ -7,3 +7,5 @@ monai
 einops
 requests
 pandas
+torch==1.10.1
+transformers==4.12.5
