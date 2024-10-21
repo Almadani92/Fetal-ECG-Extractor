@@ -3,6 +3,7 @@ numpy
 scipy
 matplotlib
 pillow
+torch
 monai
 einops
 requests
