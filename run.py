@@ -130,17 +130,23 @@ def process_fetal_ecg(file_path, signal_length):
     output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
     np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
+    # Create a time array from 0 to 4 seconds, assuming 992 samples over 4 seconds
+    time_array = np.linspace(0, 4, 992)
+
     # Plot subplots for maternal and fetal ECG
     fig, ax = plt.subplots(2, 1, figsize=(10, 8))
-    ax[0].plot(maternal_ecg_all_sig[-992:], label="Maternal ECG", color='blue')
+
+    # Maternal ECG
+    ax[0].plot(time_array, maternal_ecg_all_sig[0:992], label="Maternal ECG", color='blue')
     ax[0].set_title("Maternal ECG")
-    ax[0].set_xlabel("Samples")
+    ax[0].set_xlabel("Time (seconds)")  # Update x-axis label to "Time (seconds)"
     ax[0].set_ylabel("Amplitude")
     ax[0].legend()
 
-    ax[1].plot(fecg_pred_all_sig[-992:], label="Fetal ECG Prediction", color='red')
+    # Fetal ECG Prediction
+    ax[1].plot(time_array, fecg_pred_all_sig[0:992], label="Fetal ECG Prediction", color='red')
     ax[1].set_title("Fetal ECG Prediction")
-    ax[1].set_xlabel("Samples")
+    ax[1].set_xlabel("Time (seconds)")  # Update x-axis label to "Time (seconds)"
     ax[1].set_ylabel("Amplitude")
     ax[1].legend()
 
@@ -154,16 +160,6 @@ def process_fetal_ecg(file_path, signal_length):
     return output_csv_path
 
 
-@app.route('/download/fetal_ecg_pred')
-def download_file():
-    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
-    if os.path.exists(output_csv_path):
-        return send_file(output_csv_path, as_attachment=True, download_name='fetal_and_maternal_ecg_signals.csv', mimetype='text/csv')
-    else:
-        logging.error('No file available for download.')
-        return "No file available for download", 404
-
-        
 @app.route('/welcome')
 def welcome_page():
     return render_template_string('''
@@ -404,8 +400,6 @@ def upload_page():
     </body>
     </html>
     '''
-
-    
     
 @app.route('/results')
 def results_page():
@@ -416,23 +410,13 @@ def results_page():
         <title>Fetal ECG Extraction Results</title>
         <style>
             body {
-                background-image: url('/static/full_pipeline.png');
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
                 font-family: Arial, sans-serif;
-                color: #fff;
+                color: #333;
                 text-align: center;
-                height: 100vh;
-                margin: 0;
-                padding: 0;
-                background-attachment: fixed;
             }
             .container {
-                background-color: rgba(0, 0, 0, 0.6);
                 padding: 20px;
                 border-radius: 10px;
-                margin-top: 50px;
                 display: inline-block;
             }
             img {
@@ -440,31 +424,73 @@ def results_page():
                 height: auto;
                 margin: 20px 0;
             }
-            .download-button {
-                padding: 10px 20px;
-                margin: 20px;
+            .feedback-form {
+                margin-top: 30px;
+            }
+            .feedback-form a {
+                text-decoration: none;
                 background-color: #28a745;
                 color: white;
-                text-decoration: none;
+                padding: 10px 20px;
                 border-radius: 5px;
-                font-size: 1em;
+                font-weight: bold;
             }
-            .download-button:hover {
-                background-color: #218838;
+            .download-link {
+                margin-top: 20px;
+                display: block;
+                text-decoration: none;
+                background-color: #007bff;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            /* Style for the citation box */
+            .citation-box {
+                background-color: #f0f0f0;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px solid #ccc;
+                margin-top: 40px;
+                color: #333;
+                max-width: 700px;
+                margin: 40px auto;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>Fetal ECG Extraction Results</h1>
+            <h1>Fetal ECG Extraction Results of First 4 Seconds of Uploaded Data</h1>
             <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
-            <br>
-            <a class="download-button" href="/download/fetal_ecg_pred" download="fetal_and_maternal_ecg_signals.csv">Download Fetal ECG as .csv File</a>
-            <p>When using this resource, please cite the original publication: M. Almadani, L. Hadjileontiadis and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645...</p>
+
+            <!-- Feedback Form Link -->
+            <div class="feedback-form">
+                <h3>We value your feedback!</h3>
+                <p>Please <a href="https://docs.google.com/forms/d/e/1FAIpQLSd_mb6cEj5CioG1j_y343KoBnrHbV6XqvIb5w2uit7pZs0mBA/viewform?usp=sf_link" target="_blank">click here</a> to rate the program and provide suggestions.</p>
+            </div>
+
+            <!-- Download Results Button -->
+            <a href="/download/fetal_ecg_pred" class="download-link">Download Full Results (.csv)</a>
+
+            <!-- Citation Box -->
+            <div class="citation-box">
+                <p>If you use this tool in your research, please cite the following publication:</p>
+                <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction, in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645" 
+            </div>
         </div>
     </body>
     </html>
     '''
+
+
+@app.route('/download/fetal_ecg_pred')
+def download_file():
+    output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
+    if os.path.exists(output_csv_path):
+        return send_file(output_csv_path, as_attachment=True, download_name='fetal_and_maternal_ecg_signals.csv', mimetype='text/csv')
+    else:
+        logging.error('No file available for download.')
+        return "No file available for download", 404
 
 
 if __name__ == '__main__':
