@@ -15,6 +15,7 @@ import csv
 import matplotlib.pyplot as plt
 from scipy.signal import decimate
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
