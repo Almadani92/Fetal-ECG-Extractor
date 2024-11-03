@@ -64,7 +64,7 @@ def download_model(url, destination):
         print(f"Error downloading the model: {response.status_code}")
 
 # Function to process fetal ECG
-def process_fecg(inputs):
+def process_fecg(inputs, kh):
     logging.info('Begin generating the fetal ECG signal...')
     device = torch.device("cpu")
     net = build_UNETR()
@@ -78,34 +78,10 @@ def process_fecg(inputs):
     urllib.request.urlretrieve(model_url, model_file_path)
     net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     
-    inputs = np.einsum('ijk->jki', inputs)
-    inputs = torch.from_numpy(inputs)
-    inputs = Variable(inputs).float().to(device)
-    print("the input shape is ------------------->>>>>>>>>>>>",inputs.shape)
-    logging.info('Running inference...')
-
-    mecg_pred, fecg_pred = net(inputs)
-    logging.info('Inference completed successfully.')
-
-
-    return fecg_pred
-
-def process_fetal_ecg(file_path, signal_length):
-    logging.info('Loading maternal ECG from .csv file...')
-   
-    df = pd.read_csv(file_path, header=None)  # No header in the CSV file
-    maternal_ecg_all_sig = df.iloc[:, 0].values
-    sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
-    downsampling_factor = np.int32(sampling_freq/250)
-    print("downsampling_factor is -------------------->",downsampling_factor)
-    if downsampling_factor >1:
-        maternal_ecg_all_sig = decimate(maternal_ecg_all_sig, downsampling_factor)
-    kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
-    maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
-    fecg_pred_all_sig = np.zeros(maternal_ecg_all_sig.shape)
+    fecg_pred_all_sig = np.zeros(inputs.shape)
 
     for i in range(kh):
-        maternal_ecg = maternal_ecg_all_sig[992*i:992*(i+1)] 
+        maternal_ecg = inputs[992*i:992*(i+1)] 
         maternal_ecg = butter_bandpass_filter(maternal_ecg, 3, 90, 250, 3)
         maternal_ecg = notch_filter_ecg(maternal_ecg, 250, 50, 30)
         maternal_ecg = (maternal_ecg - np.mean(maternal_ecg)) / np.var(maternal_ecg)
@@ -114,16 +90,38 @@ def process_fetal_ecg(file_path, signal_length):
 
         maternal_ecg = np.expand_dims(maternal_ecg, axis=1)  # Add channel dimension
         maternal_ecg = np.expand_dims(maternal_ecg, axis=1)
+        
+        maternal_ecg = np.einsum('ijk->jki', maternal_ecg)
+        maternal_ecg = torch.from_numpy(maternal_ecg)
+        maternal_ecg = Variable(maternal_ecg).float().to(device)
 
-        # Process using the model
-        fetal_ecg_pred = process_fecg(maternal_ecg)  # Run fetal ECG extraction process
-        if fetal_ecg_pred is None:
-            logging.error('Error during fetal ECG processing.')
-            return None
+        logging.info('Running inference...')
+        mecg_pred, fecg_pred = net(maternal_ecg)
+        logging.info('Inference completed successfully.')
 
-        fetal_ecg_pred = fetal_ecg_pred.cpu().detach().numpy()
-        fecg_pred_all_sig[992*i:992*(i+1)] = fetal_ecg_pred.squeeze() 
 
+        fecg_pred = fecg_pred.cpu().detach().numpy()
+        fecg_pred_all_sig[992*i:992*(i+1)] = fecg_pred.squeeze() 
+    
+    return fecg_pred_all_sig
+
+
+def process_fetal_ecg(file_path, signal_length):
+    logging.info('Loading maternal ECG from .csv file...')
+   
+    df = pd.read_csv(file_path, header=None)  # No header in the CSV file
+    maternal_ecg_all_sig = df.iloc[:, 0].values
+    # maternal_ecg_all_sig = maternal_ecg_all_sig[1:]
+    sampling_freq = maternal_ecg_all_sig.shape[0]/signal_length
+    downsampling_factor = np.int32(sampling_freq/250)
+    print("downsampling_factor is -------------------->",downsampling_factor)
+    if downsampling_factor >1:
+        maternal_ecg_all_sig = decimate(maternal_ecg_all_sig, downsampling_factor)
+    kh = np.int32(maternal_ecg_all_sig.shape[0] / 992)
+    maternal_ecg_all_sig = maternal_ecg_all_sig[:992 * kh]
+    
+    fecg_pred_all_sig = process_fecg(maternal_ecg_all_sig, kh)  # Run fetal ECG extraction process
+    
     # Stack maternal_ecg and fetal_ecg_pred as two columns
     combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
 
