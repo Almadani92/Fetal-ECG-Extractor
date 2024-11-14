@@ -121,12 +121,16 @@ def process_fetal_ecg(file_path, signal_length):
     
     fecg_pred_all_sig = process_fecg(maternal_ecg_all_sig, kh)  # Run fetal ECG extraction process
     
+    interval = 1 / 250 
+    time_array_all = np.arange(0, signal_length, interval)
+    time_array_all = time_array_all[:992*kh]
+    
     # Stack maternal_ecg and fetal_ecg_pred as two columns
-    combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig))
+    combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig, time_array_all))
 
     # Save the combined signals to a .csv file
     output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
-    np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
+    np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG,Time (Seconds)", comments='')
 
     # Create a time array from 0 to 4 seconds, assuming 992 samples over 4 seconds
     time_array = np.linspace(0, 4, 992)
