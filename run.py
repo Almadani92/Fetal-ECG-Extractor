@@ -332,7 +332,6 @@ def home_page():
     return redirect(url_for('welcome_page'))
     
 
-# Route for Upload Page
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_page():
     if request.method == 'POST':
@@ -366,9 +365,9 @@ def upload_page():
         <style>
             body {
                 background-image: url('/static/full_pipeline.png');
-                background-size: contain; /* Ensure the image fits */
-                background-position: center; /* Center the image */
-                background-repeat: no-repeat; /* Prevent duplication */
+                background-size: contain;
+                background-position: center;
+                background-repeat: no-repeat;
                 font-family: Arial, sans-serif;
                 color: #fff;
                 text-align: center;
@@ -385,12 +384,30 @@ def upload_page():
                 padding: 10px;
                 font-size: 1em;
             }
+            /* Loading message styling */
+            .loading-message {
+                display: none;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background-color: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 5px;
+                font-size: 1.2em;
+            }
         </style>
+        <script>
+            function showLoadingMessage() {
+                document.getElementById("loading-message").style.display = "block";
+            }
+        </script>
     </head>
     <body>
         <div class="container">
             <h1>Upload Maternal Abdominal ECG File</h1>
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" onsubmit="showLoadingMessage()">
                 <input type="file" name="file" accept=".csv" required>
                 <br>
                 <label for="signal_length">Uploaded Signal Length in Seconds:</label>
@@ -398,6 +415,11 @@ def upload_page():
                 <br>
                 <input type="submit" value="Upload">
             </form>
+        </div>
+
+        <!-- Loading message -->
+        <div id="loading-message" class="loading-message">
+            Processing your data, please wait...
         </div>
     </body>
     </html>
