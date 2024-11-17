@@ -14,6 +14,8 @@ from scipy.signal import butter, filtfilt, iirnotch
 import csv
 import matplotlib.pyplot as plt
 from scipy.signal import decimate
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -126,11 +128,15 @@ def process_fetal_ecg(file_path, signal_length):
     time_array_all = time_array_all[:992*kh]
     
     # Stack maternal_ecg and fetal_ecg_pred as two columns
-    combined_ecg = np.column_stack((fecg_pred_all_sig, maternal_ecg_all_sig, time_array_all))
+    combined_ecg = np.column_stack((time_array_all,fecg_pred_all_sig, maternal_ecg_all_sig))
+    
+    # Store the processed signals in app.config for later use
+    app.config['maternal_ecg_all_sig'] = maternal_ecg_all_sig
+    app.config['fecg_pred_all_sig'] = fecg_pred_all_sig
 
     # Save the combined signals to a .csv file
     output_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'fetal_and_maternal_ecg_signals.csv')
-    np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Extracted_Fetal_ECG,Maternal_abdominal_ECG,Time (Seconds)", comments='')
+    np.savetxt(output_csv_path, combined_ecg, delimiter=",", header="Time (Seconds),Extracted_Fetal_ECG,Maternal_abdominal_ECG", comments='')
 
     # Create a time array from 0 to 4 seconds, assuming 992 samples over 4 seconds
     time_array = np.linspace(0, 4, 992)
@@ -424,83 +430,128 @@ def upload_page():
     </body>
     </html>
     '''
+
     
 @app.route('/results')
 def results_page():
-    return '''
+    # Retrieve processed signals
+    maternal_ecg_all_sig = app.config.get('maternal_ecg_all_sig')  # Retrieve stored maternal ECG signal
+    fecg_pred_all_sig = app.config.get('fecg_pred_all_sig')  # Retrieve stored fetal ECG prediction
+
+    if maternal_ecg_all_sig is None or fecg_pred_all_sig is None:
+        return "No processed data available. Please upload your data and try again.", 400
+
+    # Ensure signals are NumPy arrays
+    maternal_ecg_all_sig = np.array(maternal_ecg_all_sig)
+    fecg_pred_all_sig = np.array(fecg_pred_all_sig)
+
+    # Sampling rate and sliding window configuration
+    sampling_rate = 250  # Hz
+    window_duration = 4  # seconds
+    window_size = sampling_rate * window_duration  # Samples per window
+
+    # Time axis for the signals
+    time_array = np.linspace(0, len(maternal_ecg_all_sig) / sampling_rate, len(maternal_ecg_all_sig))
+
+    # Create a sliding window figure with subplots
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.1,
+        subplot_titles=("Maternal ECG", "Fetal ECG Prediction")
+    )
+
+    # Add initial 4-second data for both maternal and fetal signals
+    fig.add_trace(go.Scatter(x=time_array[:window_size], y=maternal_ecg_all_sig[:window_size],
+                             mode='lines', name='Maternal ECG', line=dict(color='blue')),
+                  row=1, col=1)
+    fig.add_trace(go.Scatter(x=time_array[:window_size], y=fecg_pred_all_sig[:window_size],
+                             mode='lines', name='Fetal ECG Prediction', line=dict(color='red')),
+                  row=2, col=1)
+
+    # Create a slider to update the window
+    steps = []
+    for i in range(0, len(maternal_ecg_all_sig) - window_size, window_size):
+        step = dict(
+            method="update",
+            args=[
+                {"x": [time_array[i:i + window_size], time_array[i:i + window_size]],
+                 "y": [maternal_ecg_all_sig[i:i + window_size], fecg_pred_all_sig[i:i + window_size]]},
+                {"title": f"Sliding Window: {i // sampling_rate} to {(i + window_size) // sampling_rate} seconds"}
+            ],
+        )
+        steps.append(step)
+
+    sliders = [dict(
+        active=0,
+        pad={"t": 50},
+        steps=steps
+    )]
+
+    # Update layout
+    fig.update_layout(
+        sliders=sliders,
+        title="Maternal and Fetal ECG Signals",
+        xaxis_title="Time (seconds)",
+        yaxis_title="Amplitude",
+        height=600,  # Adjust height for subplots
+        showlegend=False,
+        margin=dict(t=50, l=50, r=50, b=50)  # Set global margins
+    )
+
+    # Convert Plotly figure to HTML
+    plot_html = fig.to_html(full_html=False)
+
+    # Render the result page with the Plotly plot
+    return f'''
     <!doctype html>
     <html lang="en">
     <head>
         <title>Fetal ECG Extraction Results</title>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                color: #333;
-                text-align: center;
-            }
-            .container {
-                padding: 20px;
-                border-radius: 10px;
-                display: inline-block;
-            }
-            img {
-                max-width: 90%;
-                height: auto;
-                margin: 20px 0;
-            }
-            .feedback-form {
+            .feedback-link {{
                 margin-top: 30px;
-            }
-            .feedback-form a {
                 text-decoration: none;
                 background-color: #28a745;
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
-            }
-            .download-link {
+                display: inline-block;
+            }}
+            .download-link {{
                 margin-top: 20px;
-                display: block;
                 text-decoration: none;
                 background-color: #007bff;
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
                 font-weight: bold;
-            }
-            /* Style for the citation box */
-            .citation-box {
-                background-color: #f0f0f0;
-                padding: 15px;
-                border-radius: 8px;
-                border: 1px solid #ccc;
-                margin-top: 40px;
-                color: #333;
-                max-width: 700px;
-                margin: 40px auto;
-            }
+                display: inline-block;
+            }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <h1>Fetal ECG Extraction Results of First 4 Seconds of Uploaded Data</h1>
-            <img src="/static/fetal_ecg_plot.png" alt="Fetal ECG Extraction Plot">
+        <h1>Fetal ECG Extraction Results of First 4 Seconds of Uploaded Data</h1>
+        {plot_html}
+        
+        <!-- Feedback Link -->
+        <p>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSd_mb6cEj5CioG1j_y343KoBnrHbV6XqvIb5w2uit7pZs0mBA/viewform?usp=sf_link" 
+               class="feedback-link" target="_blank">Click Here to Provide Feedback</a>
+        </p>
 
-            <!-- Feedback Form Link -->
-            <div class="feedback-form">
-                <h3>We value your feedback!</h3>
-                <p>Please <a href="https://docs.google.com/forms/d/e/1FAIpQLSd_mb6cEj5CioG1j_y343KoBnrHbV6XqvIb5w2uit7pZs0mBA/viewform?usp=sf_link" target="_blank">click here</a> to rate the program and provide suggestions.</p>
-            </div>
-
-            <!-- Download Results Button -->
+        <!-- Download Button -->
+        <p>
             <a href="/download/fetal_ecg_pred" class="download-link">Download Full Results (.csv)</a>
+        </p>
 
-            <!-- Citation Box -->
-            <div class="citation-box">
-                <p>If you use this tool in your research, please cite the following publication:</p>
-                <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction, in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645" 
-            </div>
+        <!-- Citation Box -->
+        <div class="citation-box" style="background-color: #f0f0f0; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 40px; color: #333; max-width: 700px; margin: 40px auto;">
+            <p>If you use this tool in your research, please cite the following publication:</p>
+            <p>M. Almadani, L. Hadjileontiadis, and A. Khandoker, "One-Dimensional W-NETR for Non-Invasive Single Channel Fetal ECG Extraction," 
+            <br>in IEEE Journal of Biomedical and Health Informatics, vol. 27, no. 7, pp. 3198-3209, July 2023, doi: 10.1109/JBHI.2023.3266645.</p>
         </div>
     </body>
     </html>
