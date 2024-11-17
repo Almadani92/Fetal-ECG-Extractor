@@ -471,7 +471,7 @@ def results_page():
 
     # Create a slider to update the window
     steps = []
-    for i in range(0, len(maternal_ecg_all_sig) - window_size, window_size):
+    for i in range(0, len(maternal_ecg_all_sig) - window_size + 1, window_size):  # Include the last window
         step = dict(
             method="update",
             args=[
@@ -482,22 +482,37 @@ def results_page():
         )
         steps.append(step)
 
+    # If there's a remainder of the signal, add a final step for it
+    if len(maternal_ecg_all_sig) % window_size != 0:
+        remainder_start = len(maternal_ecg_all_sig) - window_size
+        steps.append(dict(
+            method="update",
+            args=[
+                {"x": [time_array[remainder_start:], time_array[remainder_start:]],
+                 "y": [maternal_ecg_all_sig[remainder_start:], fecg_pred_all_sig[remainder_start:]]},
+                {"title": f"Sliding Window: {remainder_start // sampling_rate} to {len(maternal_ecg_all_sig) // sampling_rate} seconds"}
+            ],
+        ))
+
     sliders = [dict(
         active=0,
         pad={"t": 50},
         steps=steps
     )]
 
+
     # Update layout
     fig.update_layout(
         sliders=sliders,
         title="Maternal and Fetal ECG Signals",
-        xaxis_title="Time (seconds)",
-        yaxis_title="Amplitude",
+        yaxis_title="Amplitude (Maternal ECG)",  # Add Y-axis title for the first subplot
+        yaxis2_title="Amplitude (Fetal ECG)",  # Add Y-axis title for the second subplot
+        xaxis2_title="Time (seconds)",  # Add X-axis title below the second subplot (fetal ECG)
         height=600,  # Adjust height for subplots
         showlegend=False,
         margin=dict(t=50, l=50, r=50, b=50)  # Set global margins
     )
+
 
     # Convert Plotly figure to HTML
     plot_html = fig.to_html(full_html=False)
