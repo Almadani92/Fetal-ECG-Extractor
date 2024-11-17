@@ -8,3 +8,4 @@ monai==1.0.1
 einops
 requests
 pandas
+plotly
