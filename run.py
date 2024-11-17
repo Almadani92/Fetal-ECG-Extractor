@@ -533,7 +533,7 @@ def results_page():
         </style>
     </head>
     <body>
-        <h1>Fetal ECG Extraction Results of First 4 Seconds of Uploaded Data</h1>
+        <h1>Fetal ECG Extraction Results</h1>
         {plot_html}
         
         <!-- Feedback Link -->
