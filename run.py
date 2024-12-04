@@ -17,6 +17,7 @@ from scipy.signal import decimate
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
