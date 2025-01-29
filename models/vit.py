@@ -17,14 +17,20 @@ import torch.nn as nn
 
 #from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from monai.networks.blocks.transformerblock import TransformerBlock
-import torch
-import torch.nn as nn
+
 
 class CustomPatchEmbeddingBlock(nn.Module):
-    def __init__(self, in_channels, img_size, patch_size, hidden_size, num_heads, pos_embed=None, dropout_rate=0.0, spatial_dims=2):
+    def __init__(self, in_channels, img_size, patch_size, hidden_size, num_heads, pos_embed=None, dropout_rate=0.0, spatial_dims=1):
         super().__init__()
 
-        if spatial_dims == 2:
+        if spatial_dims == 1:
+            self.conv = nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=hidden_size,
+                kernel_size=patch_size,
+                stride=patch_size
+            )
+        elif spatial_dims == 2:
             self.conv = nn.Conv2d(
                 in_channels=in_channels,
                 out_channels=hidden_size,
@@ -39,7 +45,7 @@ class CustomPatchEmbeddingBlock(nn.Module):
                 stride=patch_size
             )
         else:
-            raise ValueError("Only spatial_dims 2 or 3 are supported.")
+            raise ValueError("Only spatial_dims 1, 2, or 3 are supported.")
 
         self.pos_embed = pos_embed  # Store positional embeddings
 
@@ -55,7 +61,6 @@ class CustomPatchEmbeddingBlock(nn.Module):
         x = self.norm(x)  # Apply layer normalization
         x = self.dropout(x)  # Apply dropout
         return x
-
 
 
 __all__ = ["ViT"]
@@ -129,7 +134,7 @@ class ViT(nn.Module):
             num_heads=num_heads,
             pos_embed=pos_embed,
             dropout_rate=dropout_rate,
-            spatial_dims=spatial_dims,
+            spatial_dims=spatial_dims,  # Change to 1 for 1D ECG data
         )
 
         #self.patch_embedding = PatchEmbeddingBlock(
