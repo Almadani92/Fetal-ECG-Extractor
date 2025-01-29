@@ -15,52 +15,8 @@ from typing import Sequence, Union
 import torch
 import torch.nn as nn
 
-#from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
+from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from monai.networks.blocks.transformerblock import TransformerBlock
-
-
-class CustomPatchEmbeddingBlock(nn.Module):
-    def __init__(self, in_channels, img_size, patch_size, hidden_size, num_heads, pos_embed=None, dropout_rate=0.0, spatial_dims=1):
-        super().__init__()
-
-        if spatial_dims == 1:
-            self.conv = nn.Conv1d(
-                in_channels=in_channels,
-                out_channels=hidden_size,
-                kernel_size=patch_size,
-                stride=patch_size
-            )
-        elif spatial_dims == 2:
-            self.conv = nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=hidden_size,
-                kernel_size=patch_size,
-                stride=patch_size
-            )
-        elif spatial_dims == 3:
-            self.conv = nn.Conv3d(
-                in_channels=in_channels,
-                out_channels=hidden_size,
-                kernel_size=patch_size,
-                stride=patch_size
-            )
-        else:
-            raise ValueError("Only spatial_dims 1, 2, or 3 are supported.")
-
-        self.pos_embed = pos_embed  # Store positional embeddings
-
-        # Additional layers if needed
-        self.dropout = nn.Dropout(dropout_rate)
-        self.norm = nn.LayerNorm(hidden_size)
-
-    def forward(self, x):
-        x = self.conv(x)  # Apply patch embedding convolution
-        x = x.flatten(2).transpose(1, 2)  # Reshape for Transformer
-        if self.pos_embed is not None:
-            x += self.pos_embed  # Add positional embeddings
-        x = self.norm(x)  # Apply layer normalization
-        x = self.dropout(x)  # Apply dropout
-        return x
 
 
 __all__ = ["ViT"]
@@ -126,7 +82,9 @@ class ViT(nn.Module):
             raise ValueError("hidden_size should be divisible by num_heads.")
 
         self.classification = classification
-        self.patch_embedding = CustomPatchEmbeddingBlock(
+
+
+        self.patch_embedding = PatchEmbeddingBlock(
             in_channels=in_channels,
             img_size=img_size,
             patch_size=patch_size,
@@ -134,19 +92,8 @@ class ViT(nn.Module):
             num_heads=num_heads,
             pos_embed=pos_embed,
             dropout_rate=dropout_rate,
-            spatial_dims=spatial_dims,  # Change to 1 for 1D ECG data
+            spatial_dims=spatial_dims,
         )
-
-        #self.patch_embedding = PatchEmbeddingBlock(
-        #    in_channels=in_channels,
-        #    img_size=img_size,
-        #    patch_size=patch_size,
-         #   hidden_size=hidden_size,
-          #  num_heads=num_heads,
-           # pos_embed=pos_embed,
-            #dropout_rate=dropout_rate,
-            #spatial_dims=spatial_dims,
-        #)
         self.blocks = nn.ModuleList(
             [TransformerBlock(hidden_size, mlp_dim, num_heads, dropout_rate) for i in range(num_layers)]
         )
