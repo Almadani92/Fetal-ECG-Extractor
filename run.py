@@ -73,11 +73,11 @@ def process_fecg(inputs, kh):
     net.to(device)
 
     # URL of your model in Dropbox or another storage
-    #model_url = "https://www.dropbox.com/scl/fi/qsev17tj006jwg2iv499k/saved_model5_japan.pkl?rlkey=mte6osrzrg3ys6ck8lgfiji9f&st=x8n9zg6g&dl=1"
-    model_url = "https://www.dropbox.com/scl/fi/fwbql0syqeq131l80bt92/saved_model10_japan.pkl?rlkey=77atuh0oimgdms2e05qevm3fx&st=h74umteo&dl=1"
+    model_url = "https://www.dropbox.com/scl/fi/qsev17tj006jwg2iv499k/saved_model5_japan.pkl?rlkey=mte6osrzrg3ys6ck8lgfiji9f&st=x8n9zg6g&dl=1"
+    #model_url = "https://www.dropbox.com/scl/fi/fwbql0syqeq131l80bt92/saved_model10_japan.pkl?rlkey=77atuh0oimgdms2e05qevm3fx&st=h74umteo&dl=1"
     
     # Download the model and save it locally
-    model_file_path = "saved_model10_japan.pkl"
+    model_file_path = "saved_model5_japan.pkl"
     urllib.request.urlretrieve(model_url, model_file_path)
     net.load_state_dict(torch.load(model_file_path, map_location=torch.device('cpu')))
     
